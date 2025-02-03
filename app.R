@@ -79,22 +79,32 @@ ui <- page_fillable(
       "Deprivation in Local Authorities",
 
       card(
-        full_screen = TRUE,
+        tags$div(
+          style = "align-items: center;",
+          tags$strong(
+            tags$span("Choose a measure of deprivation: ")
+          ),
+          tags$div(
+            class = "flex-select",
+            style = "display: inline-block; border: none;",
 
-        selectInput(
-          "map_var",
-          "Select Variable to Display",
-          choices = c(
-            "Population-weighted average score" = "Score",
-            "% of highly deprived neighbourhoods" = "Proportion",
-            "% of people living in the most deprived neighbourhoods" = "Extent",
-            "Income Score" = "Income_Score",
-            "Employment Score" = "Employment_Score",
-            "Education Score" = "Education_Score",
-            "Health Score" = "Health_Score",
-            "Crime Score" = "Crime_Score",
-            "Housing & Access Score" = "Housing_and_Access_Score",
-            "Environment Score" = "Environment_Score"
+            selectizeInput(
+              "map_var",
+              "",
+              choices = c(
+                "Population-weighted average score" = "Score",
+                "% of highly deprived neighbourhoods" = "Proportion",
+                "% of people living in the most deprived neighbourhoods" = "Extent",
+                "Income Score" = "Income_Score",
+                "Employment Score" = "Employment_Score",
+                "Education Score" = "Education_Score",
+                "Health Score" = "Health_Score",
+                "Crime Score" = "Crime_Score",
+                "Housing & Access Score" = "Housing_and_Access_Score",
+                "Environment Score" = "Environment_Score"
+              ),
+              options = list(dropdownParent = 'body')
+            )
           )
         )
       ),
@@ -106,23 +116,38 @@ ui <- page_fillable(
 
     nav_panel(
       "Compare Local Authorities",
-      sidebarLayout(
-        sidebarPanel(
-          selectInput("imd_var", "Choose a measure of deprivation",
-                      choices = c("Population-weighted average score" = "Score",
-                                  "% of highly deprived neighbourhoods" = "Proportion",
-                                  "% of people living in the most deprived neighbourhoods" = "Extent",
-                                  "Income Score" = "Income_Score",
-                                  "Employment Score" = "Employment_Score",
-                                  "Education Score" = "Education_Score",
-                                  "Health Score" = "Health_Score",
-                                  "Crime Score" = "Crime_Score",
-                                  "Housing & Access Score" = "Housing_and_Access_Score",
-                                  "Environment Score" = "Environment_Score"))
-        ),
-        mainPanel(
-          plotlyOutput("lad_comparison")
+
+      card(
+        tags$div(
+          style = "align-items: center;",
+          tags$strong(
+            tags$span("Choose a measure of deprivation: ")
+          ),
+          tags$div(
+            class = "flex-select",
+            style = "display: inline-block; border: none;",
+
+            selectizeInput(
+              "imd_var",
+              "",
+              choices = c("Population-weighted average score" = "Score",
+                          "% of highly deprived neighbourhoods" = "Proportion",
+                          "% of people living in the most deprived neighbourhoods" = "Extent",
+                          "Income Score" = "Income_Score",
+                          "Employment Score" = "Employment_Score",
+                          "Education Score" = "Education_Score",
+                          "Health Score" = "Health_Score",
+                          "Crime Score" = "Crime_Score",
+                          "Housing & Access Score" = "Housing_and_Access_Score",
+                          "Environment Score" = "Environment_Score"),
+              options = list(dropdownParent = 'body')
+            )
+          )
         )
+      ),
+
+      card(
+        plotlyOutput("lad_comparison")
       )
     ),
 
