@@ -51,110 +51,114 @@ lad_boundaries <- left_join(lad_boundaries, imd_lad, by = "lad_code")
 # ---------------------
 # Define UI
 # ---------------------
-ui <- page_navbar(
+ui <- page_fillable(
   includeCSS("styles.css"),
 
   # The title includes an inline drop-down to choose a region.
-  title = tags$div(
-    style = "display: flex; align-items: center;",
-    tags$span("Explore deprivation in "),
+  tags$h3(
     tags$div(
-      class = "flex-select",
-      style = "display: inline-block; border: none;",
-      selectInput("region_filter", label = NULL,
-                  choices = c("England", sort(unique(imd_lad$region_name))),
-                  selected = "England",
-                  selectize = FALSE,
-                  width = "150px")
+      style = "align-items: center;",
+      tags$span("Explore deprivation in "),
+      tags$div(
+        class = "flex-select",
+        style = "display: inline-block; border: none;",
+        selectInput("region_filter", label = NULL,
+                    choices = c("England", sort(unique(imd_lad$region_name))),
+                    selected = "England",
+                    selectize = FALSE,
+                    width = "150px")
+      )
     )
   ),
 
   theme = bs_theme("lumen", version = 5),
 
-  # ---- Tab 1: Interactive Map ----
-  nav_panel(
-    "Deprivation in Local Authorities",
+  navset_underline(
+    # ---- Tab 1: Interactive Map ----
+    nav_panel(
+      "Deprivation in Local Authorities",
 
-    card(
-      full_screen = TRUE,
+      card(
+        full_screen = TRUE,
 
-      selectInput(
-        "map_var",
-        "Select Variable to Display",
-        choices = c(
-          "Population-weighted average score" = "Score",
-          "% of highly deprived neighbourhoods" = "Proportion",
-          "% of people living in the most deprived neighbourhoods" = "Extent",
-          "Income Score" = "Income_Score",
-          "Employment Score" = "Employment_Score",
-          "Education Score" = "Education_Score",
-          "Health Score" = "Health_Score",
-          "Crime Score" = "Crime_Score",
-          "Housing & Access Score" = "Housing_and_Access_Score",
-          "Environment Score" = "Environment_Score"
+        selectInput(
+          "map_var",
+          "Select Variable to Display",
+          choices = c(
+            "Population-weighted average score" = "Score",
+            "% of highly deprived neighbourhoods" = "Proportion",
+            "% of people living in the most deprived neighbourhoods" = "Extent",
+            "Income Score" = "Income_Score",
+            "Employment Score" = "Employment_Score",
+            "Education Score" = "Education_Score",
+            "Health Score" = "Health_Score",
+            "Crime Score" = "Crime_Score",
+            "Housing & Access Score" = "Housing_and_Access_Score",
+            "Environment Score" = "Environment_Score"
+          )
+        )
+      ),
+
+      card(
+        leafletOutput("map", height = 600)
+      )
+    ),
+
+    nav_panel(
+      "Compare Local Authorities",
+      sidebarLayout(
+        sidebarPanel(
+          selectInput("imd_var", "Choose a measure of deprivation",
+                      choices = c("Population-weighted average score" = "Score",
+                                  "% of highly deprived neighbourhoods" = "Proportion",
+                                  "% of people living in the most deprived neighbourhoods" = "Extent",
+                                  "Income Score" = "Income_Score",
+                                  "Employment Score" = "Employment_Score",
+                                  "Education Score" = "Education_Score",
+                                  "Health Score" = "Health_Score",
+                                  "Crime Score" = "Crime_Score",
+                                  "Housing & Access Score" = "Housing_and_Access_Score",
+                                  "Environment Score" = "Environment_Score"))
+        ),
+        mainPanel(
+          plotlyOutput("lad_comparison")
         )
       )
     ),
 
-    card(
-      leafletOutput("map", height = 600)
+    # ---- Tab 2: Scatter Plot Analysis ----
+    nav_panel(
+      "Deprivation in neighbourhoods",
+    ),
+
+    # ---- Tab 4: Correlation Heatmap ----
+    nav_panel("Domains of deprivation",
+              sidebarLayout(
+                sidebarPanel(
+                  helpText("Select the LAD-level domain scores to include in the correlation analysis:"),
+                  checkboxGroupInput("corr_vars", "Variables",
+                                     choices = c("Overall Score" = "Score",
+                                                 "Income Score" = "Income_Score",
+                                                 "Employment Score" = "Employment_Score",
+                                                 "Education Score" = "Education_Score",
+                                                 "Health Score" = "Health_Score",
+                                                 "Crime Score" = "Crime_Score",
+                                                 "Housing & Access Score" = "Housing_and_Access_Score",
+                                                 "Environment Score" = "Environment_Score"),
+                                     selected = c("Score", "Income_Score", "Employment_Score", "Education_Score", "Health_Score"))
+                ),
+                mainPanel(
+                  plotOutput("corrHeatmap")
+                )
+              )
+    ),
+
+    # ---- Tab 5: Data Table ----
+    nav_panel("Data Table",
+              fluidPage(
+                DTOutput("dataTable")
+              )
     )
-  ),
-
-  nav_panel(
-   "Compare Local Authorities",
-   sidebarLayout(
-     sidebarPanel(
-       selectInput("imd_var", "Choose a measure of deprivation",
-                   choices = c("Population-weighted average score" = "Score",
-                               "% of highly deprived neighbourhoods" = "Proportion",
-                               "% of people living in the most deprived neighbourhoods" = "Extent",
-                               "Income Score" = "Income_Score",
-                               "Employment Score" = "Employment_Score",
-                               "Education Score" = "Education_Score",
-                               "Health Score" = "Health_Score",
-                               "Crime Score" = "Crime_Score",
-                               "Housing & Access Score" = "Housing_and_Access_Score",
-                               "Environment Score" = "Environment_Score"))
-     ),
-     mainPanel(
-       plotlyOutput("lad_comparison")
-     )
-   )
-  ),
-
-  # ---- Tab 2: Scatter Plot Analysis ----
-  nav_panel(
-    "Deprivation in neighbourhoods",
-  ),
-
-  # ---- Tab 4: Correlation Heatmap ----
-  nav_panel("Domains of deprivation",
-          sidebarLayout(
-            sidebarPanel(
-              helpText("Select the LAD-level domain scores to include in the correlation analysis:"),
-              checkboxGroupInput("corr_vars", "Variables",
-                                 choices = c("Overall Score" = "Score",
-                                             "Income Score" = "Income_Score",
-                                             "Employment Score" = "Employment_Score",
-                                             "Education Score" = "Education_Score",
-                                             "Health Score" = "Health_Score",
-                                             "Crime Score" = "Crime_Score",
-                                             "Housing & Access Score" = "Housing_and_Access_Score",
-                                             "Environment Score" = "Environment_Score"),
-                                 selected = c("Score", "Income_Score", "Employment_Score", "Education_Score", "Health_Score"))
-            ),
-            mainPanel(
-              plotOutput("corrHeatmap")
-            )
-          )
-  ),
-
-  # ---- Tab 5: Data Table ----
-  nav_panel("Data Table",
-          fluidPage(
-            DTOutput("dataTable")
-          )
   )
 )
 
