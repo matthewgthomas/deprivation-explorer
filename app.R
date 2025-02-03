@@ -59,7 +59,8 @@ ui <- page_navbar(
     style = "display: flex; align-items: center;",
     tags$span("Explore deprivation in "),
     tags$div(
-      style = "display: inline-block; margin-left: 5px; border: none;",
+      class = "flex-select",
+      style = "display: inline-block; border: none;",
       selectInput("region_filter", label = NULL,
                   choices = c("England", sort(unique(imd_lad$region_name))),
                   selected = "England",

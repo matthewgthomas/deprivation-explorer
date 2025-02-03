@@ -6,18 +6,43 @@
 }
 
 #region_filter {
-   /* Reset */
   appearance: none;
   border: 0;
   outline: 0;
+  padding: 0 1rem;
+  width: 260px;
   font: inherit;
-  /* Personalize */
-  width: 20rem;
-  padding: 1rem 4rem 1rem 1rem;
-  background: var(--arrow-icon) no-repeat right 0.8em center / 1.4em,
-    linear-gradient(to left, var(--arrow-bg) 3em, var(--select-bg) 3em);
-  color: white;
-  border-radius: 0.25em;
-  box-shadow: 0 0 1em 0 rgba(0, 0, 0, 0.2);
+  color: blue;
   cursor: pointer;
+  box-shadow: none;
+}
+
+#region_filter::-ms-expand {
+  display: none;
+}
+
+#region_filter::hover {
+  text-decoration: underline;
+}
+
+#region_filter:hover {
+  text-decoration: underline;
+}
+
+/* Custom arrow */
+.flex-select > .form-group > div {
+  position: relative;
+}
+
+.flex-select > .form-group > div::after {
+  content: "▼";
+  color: blue;
+  font-size: 1rem;
+  top: 3px;
+  left: 0px;
+  position: absolute;
+}
+
+.flex-select > .form-group {
+  margin: 0 0.3rem;
 }
