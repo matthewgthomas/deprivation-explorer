@@ -47,6 +47,24 @@ lad_boundaries <- boundaries_ltla21 |>
 # (Make sure the field names match; here we assume both have 'lad_code'.)
 lad_boundaries <- left_join(lad_boundaries, imd_lad, by = "lad_code")
 
+imd_lad_variables <-
+  c(
+    "Population-weighted average score" = "Score",
+    "% of highly deprived neighbourhoods" = "Proportion",
+    "% of people living in the most deprived neighbourhoods" = "Extent",
+    "Income Score" = "Income_Score",
+    "Employment Score" = "Employment_Score",
+    "Education Score" = "Education_Score",
+    "Health Score" = "Health_Score",
+    "Crime Score" = "Crime_Score",
+    "Housing & Access Score" = "Housing_and_Access_Score",
+    "Environment Score" = "Environment_Score"
+  )
+
+# Function to get name of imd_lad_variables entry from value
+imd_lad_variables_name <- function(value) {
+  names(imd_lad_variables)[match(value, imd_lad_variables)]
+}
 
 # ---------------------
 # Define UI
@@ -110,6 +128,7 @@ ui <- page_fillable(
       ),
 
       card(
+        full_screen = TRUE,
         leafletOutput("map", height = 600)
       )
     ),
@@ -216,6 +235,15 @@ server <- function(input, output, session) {
     # Create a color palette based on the selected variable
     pal <- colorNumeric("YlOrRd", domain = boundaries[[input$map_var]])
 
+    # Make a labelFormat function that formats the labels as percentages if the variable is a proportion, otherwise as numeric
+    formatNumberOrPercentage <- function(type = "numeric", x) {
+      if (input$map_var %in% c("Proportion", "Extent")) {
+        scales::percent(x, accuracy = 0.1)
+      } else {
+        scales::number(x, accuracy = 0.1)
+      }
+    }
+
     leaflet(boundaries) %>%
       addTiles() %>%
       addPolygons(
@@ -234,7 +262,8 @@ server <- function(input, output, session) {
         label = ~paste0(lad_code, ": ", round(get(input$map_var), 2))
       ) %>%
       addLegend(pal = pal, values = ~get(input$map_var),
-                opacity = 0.7, title = input$map_var,
+                opacity = 0.7, title = imd_lad_variables_name(input$map_var),
+                labFormat = formatNumberOrPercentage,
                 position = "bottomright")
   })
 
