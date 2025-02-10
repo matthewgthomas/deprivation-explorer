@@ -18,6 +18,7 @@ library(IMD)
 # ---------------------
 # Load Data
 # ---------------------
+# ---- Local Authority data ----
 lad_names <- boundaries_ltla21 |>
   st_drop_geometry() |>
   rename(lad_code = ltla21_code, lad_name = ltla21_name)
@@ -30,13 +31,6 @@ imd_lad <- IMD::imd_england_lad |>
   ) |>
   left_join(lad_names)
 
-# IMD for Neighbourhoods (LSOA)
-imd_lsoa <- IMD::imd_england_lsoa |>
-  left_join(
-    lookup_lsoa11_ltla21 |>
-      select(lsoa_code = lsoa11_code, lad_code = ltla21_code)
-  )
-
 # Load LAD boundaries as an sf object (GeoJSON or shapefile)
 # (Replace "lad_boundaries.geojson" with your actual file)
 lad_boundaries <- boundaries_ltla21 |>
@@ -47,6 +41,31 @@ lad_boundaries <- boundaries_ltla21 |>
 # (Make sure the field names match; here we assume both have 'lad_code'.)
 lad_boundaries <- left_join(lad_boundaries, imd_lad, by = "lad_code")
 
+# ---- Neighbourhood-level data ----
+# Calculate quintiles
+imd_lsoa <- IMD::imd_england_lsoa |>
+  left_join(
+    lookup_lsoa11_ltla21 |>
+      select(lsoa_code = lsoa11_code, lad_code = ltla21_code)
+  ) |>
+  mutate(
+    IMD_quintile = ceiling(IMD_decile / 2),
+    Income_quintile = ceiling(Income_decile / 2),
+    Employment_quintile = ceiling(Employment_decile / 2),
+    Education_quintile = ceiling(Education_decile / 2),
+    Health_quintile = ceiling(Health_decile / 2),
+    Crime_quintile = ceiling(Crime_decile / 2),
+    Housing_and_Access_quintile = ceiling(Housing_and_Access_decile / 2),
+    Environment_quintile = ceiling(Environment_decile / 2)
+  ) |>
+  select(lsoa_code, lad_code, ends_with("quintile"))
+
+# Show only 20% most deprived areas on the map
+lsoa_boundaries <-
+  boundaries_lsoa11 |>
+  left_join(imd_lsoa, by = join_by(lsoa11_code == lsoa_code))
+
+# ---- Map legend ----
 imd_lad_variables <-
   c(
     "Population-weighted average score" = "Score",
@@ -170,9 +189,69 @@ ui <- page_fillable(
       )
     ),
 
-    # ---- Tab 2: Scatter Plot Analysis ----
+    # ---- Neighourhood IMD map ----
     nav_panel(
       "Deprivation in neighbourhoods",
+
+      layout_column_wrap(
+        width = "200px",
+
+        card(
+          tags$div(
+            style = "align-items: center;",
+            tags$strong(
+              tags$span("Choose a measure of deprivation: ")
+            ),
+            tags$div(
+              class = "flex-select",
+              style = "display: inline-block; border: none;",
+
+              selectizeInput(
+                "neighbourhood_map_var",
+                "",
+                choices = c(
+                  "Overall deprivation" = "IMD_quintile",
+                  "Income" = "Income_quintile",
+                  "Employment" = "Employment_quintile",
+                  "Education" = "Education_quintile",
+                  "Health" = "Health_quintile",
+                  "Crime" = "Crime_quintile",
+                  "Housing & Access" = "Housing_and_Access_quintile",
+                  "Environment" = "Environment_quintile"
+                ),
+                options = list(dropdownParent = 'body')
+              )
+            )
+          )
+        ),
+
+        card(
+          card_header("Choose one or more Local Authorities"),
+          tags$div(
+            style = "align-items: center;",
+            tags$strong(
+              tags$span("")
+            ),
+            tags$div(
+              class = "flex-select",
+              style = "display: inline-block; border: none;",
+
+              selectizeInput(
+                "neighbourhood_lad",
+                "",
+                choices = sort(lad_names$lad_name),
+                multiple = TRUE,
+                options = list(dropdownParent = 'body')
+              )
+            )
+          )
+        )
+      ),
+
+      card(
+        full_screen = TRUE,
+        leafletOutput("neighbourhood_map", height = 600)
+      )
     ),
 
     # ---- Tab 4: Correlation Heatmap ----
@@ -220,7 +299,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # --- Map Output ---
+  # --- Local Authority map ---
   output$map <- renderLeaflet({
     # Ensure spatial boundaries exist
     req(nrow(lad_boundaries) > 0)
@@ -277,6 +356,61 @@ server <- function(input, output, session) {
 
     ggplotly(plt)
   })
+
+  # ---- Neighourhood map ----
+  output$neighbourhood_map <- renderLeaflet({
+    # Ensure spatial boundaries exist
+    req(nrow(lsoa_boundaries) > 0)
+
+    # Filter spatial data if a Local Authority is selected
+    if (length(input$neighbourhood_lad) > 0) {
+      lad_codes <- lad_names$lad_code[lad_names$lad_name %in% input$neighbourhood_lad]
+      boundaries <- lsoa_boundaries %>% filter(lad_code %in% lad_codes)
+      selected_lad_boundaries <- lad_boundaries %>% filter(ltla21_name %in% input$neighbourhood_lad)
+    } else {
+      boundaries <- lsoa_boundaries
+      selected_lad_boundaries <- lad_boundaries
+    }
+
+    # Create a color palette based on the selected variable
+    # pal <- colorNumeric("YlOrRd", domain = boundaries[[input$neighbourhood_map_var]])
+
+    # Select the variable in boundaries based on what the user selected in neighbourhood_map_var and filter values that are <= 2
+    filtered_boundaries <-
+      boundaries %>%
+      filter(get(input$neighbourhood_map_var) <= 2)
+
+    filtered_boundaries |>
+      leaflet() %>%
+      addTiles() %>%
+
+      # Add LAD boundaries
+      addPolygons(
+        data = selected_lad_boundaries,
+        fillColor = "transparent",
+        weight = 2,
+        opacity = 1,
+        color = "black",
+        fillOpacity = 0.5
+      ) %>%
+
+      # Add 20% most deprived LSOAs
+      addPolygons(
+        fillColor = "red",
+        weight = 1,
+        opacity = 0.5,
+        color = "white",
+        dashArray = "3",
+        fillOpacity = 0.7,
+        highlight = highlightOptions(
+          weight = 3,
+          color = "#666",
+          dashArray = "",
+          fillOpacity = 0.7,
+          bringToFront = TRUE),
+        label = ~paste0(lad_code, ": ", round(get(input$neighbourhood_map_var), 2))
+      )
+    })
 
   # --- Scatter Plot Output ---
   output$scatterPlot <- renderPlot({
