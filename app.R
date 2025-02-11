@@ -185,6 +185,7 @@ ui <- page_fillable(
       ),
 
       card(
+        card_header(textOutput("lad_comparison_title")),
         plotlyOutput("lad_comparison")
       )
     ),
@@ -346,15 +347,77 @@ server <- function(input, output, session) {
                 position = "bottomright")
   })
 
-  # --- LA comparison ---
+  # ---- LA comparison ----
+  output$lad_comparison_title <- renderText({
+    str_glue("{imd_lad_variables_name(input$imd_var)} for Local Authorities in {input$region_filter}")
+  })
+
   output$lad_comparison <- renderPlotly({
     data <- filtered_lad()
 
-    plt <- data |>
-      ggplot(aes(x = reorder(lad_name, .data[[input$imd_var]]), y = .data[[input$imd_var]])) +
-      geom_col(aes(fill = region_name))
+    # Format the labels as percentages if the variable is a proportion, otherwise as numeric
+    formatNumberOrPercentage <- function(x) {
+      if (input$imd_var %in% c("Proportion", "Extent")) {
+        scales::percent(x, accuracy = 0.1)
+      } else {
+        scales::number(x, accuracy = 0.1)
+      }
+    }
 
-    ggplotly(plt)
+    plt <- data |>
+      na.omit() |>
+      ggplot(aes(x = reorder(lad_name, .data[[input$imd_var]]), y = .data[[input$imd_var]])) +
+      geom_col(aes(
+        fill = region_name,
+        text = str_glue("{imd_lad_variables_name(input$imd_var)} in {lad_name}: {formatNumberOrPercentage(.data[[input$imd_var]])}")
+      )) +
+      coord_flip() +
+      scale_y_continuous(labels = formatNumberOrPercentage) +
+      scale_fill_brewer(palette = "Pastel1") +
+      theme_minimal() +
+      theme(
+        legend.position = "top"
+      ) +
+      labs(
+        x = NULL,
+        y = imd_lad_variables_name(input$imd_var)
+      )
+
+    ggplotly(plt, height = nrow(data) * 15, tooltip = "text") |>
+      config(
+        displayModeBar = TRUE,
+        displaylogo = FALSE,
+        modeBarButtonsToRemove = list(
+          "zoom",
+          "pan",
+          "select",
+          "zoomIn",
+          "zoomOut",
+          "autoScale",
+          "resetScale",
+          "lasso2d",
+          "hoverClosestCartesian",
+          "hoverCompareCartesian"
+        ),
+        # Download button
+        toImageButtonOptions = list(
+          height = NULL,
+          width = NULL,
+          scale = 6
+        )
+      ) |>
+      layout(
+        showlegend = if_else(input$region_filter == "England", TRUE, FALSE),
+        legend = list(
+          orientation = "h",
+          x = 0,
+          xanchor = "center",
+          y = 1,
+          yanchor = "bottom",
+          title = NA
+        ),
+        margin = list(t = 50)  # Reduce top margin to bring plot closer to legend
+      )
   })
 
   # ---- Neighourhood map ----
@@ -421,18 +484,6 @@ server <- function(input, output, session) {
            y = input$y_var,
            title = paste("Scatter Plot:", input$x_var, "vs", input$y_var)) +
       theme_minimal()
-  })
-
-  # --- LSOA Distribution Boxplot ---
-  output$lsoaBoxplot <- renderPlot({
-    data <- imd_lsoa %>% filter(lad_code == input$selected_lad)
-    ggplot(data, aes_string(x = "factor(1)", y = input$lsoa_domain)) +
-      geom_boxplot(fill = "skyblue") +
-      labs(x = "Local Authority",
-           y = input$lsoa_domain,
-           title = paste("Distribution of", input$lsoa_domain, "in", input$selected_lad)) +
-      theme_minimal() +
-      theme(axis.text.x = element_blank())
   })
 
   # --- Correlation Heatmap ---
