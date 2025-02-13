@@ -21,7 +21,11 @@ library(IMD)
 # ---- Local Authority data ----
 lad_names <- boundaries_ltla21 |>
   st_drop_geometry() |>
-  rename(lad_code = ltla21_code, lad_name = ltla21_name)
+  rename(lad_code = ltla21_code, lad_name = ltla21_name) |>
+  left_join(
+    lookup_ltla21_region21 |>
+      select(lad_code = ltla21_code, region_name = region21_name)
+  )
 
 # IMD for Local Authority Districts (LAD)
 imd_lad <- IMD::imd_england_lad |>
@@ -65,7 +69,7 @@ lsoa_boundaries <-
   boundaries_lsoa11 |>
   left_join(imd_lsoa, by = join_by(lsoa11_code == lsoa_code))
 
-# ---- Map legend ----
+# ---- Dropdown options ----
 imd_lad_variables <-
   c(
     "Population-weighted average score" = "Score",
@@ -80,15 +84,27 @@ imd_lad_variables <-
     "Environment Score" = "Environment_Score"
   )
 
-# Function to get name of imd_lad_variables entry from value
-imd_lad_variables_name <- function(value) {
-  names(imd_lad_variables)[match(value, imd_lad_variables)]
+imd_lsoa_variables <-
+  c(
+    "Overall deprivation" = "IMD_quintile",
+    "Income" = "Income_quintile",
+    "Employment" = "Employment_quintile",
+    "Education" = "Education_quintile",
+    "Health" = "Health_quintile",
+    "Crime" = "Crime_quintile",
+    "Housing & Access" = "Housing_and_Access_quintile",
+    "Environment" = "Environment_quintile"
+  )
+
+# Function to get name of the chosen variable from from dropdown value
+variables_name <- function(value, variables) {
+  names(imd_lad_variables)[match(value, variables)]
 }
 
 # ---------------------
 # Define UI
 # ---------------------
-ui <- page_fillable(
+ui <- page_sidebar(
   includeCSS("styles.css"),
 
   # The title includes an inline drop-down to choose a region.
@@ -96,55 +112,101 @@ ui <- page_fillable(
     tags$div(
       style = "align-items: center;",
       tags$span("Explore deprivation in "),
+
+      # LA/neighbourhood selector
+      tags$div(
+        class = "flex-select",
+        style = "width: 227px",
+        selectInput(
+          "lad_or_lsoa",
+          label = NULL,
+          choices = c("Local Authorities", "neighbourhoods"),
+          selected = "Local Authorities",
+          selectize = FALSE
+        )
+      ),
+
+      tags$span(" in "),
+
+      # Region selector
       tags$div(
         class = "flex-select",
         style = "display: inline-block; border: none;",
-        selectInput("region_filter", label = NULL,
-                    choices = c("England", sort(unique(imd_lad$region_name))),
-                    selected = "England",
-                    selectize = FALSE,
-                    width = "150px")
+        selectInput(
+          "region_filter",
+          label = NULL,
+          choices = c("England", sort(unique(imd_lad$region_name))),
+          selected = "England",
+          selectize = FALSE,
+          width = "150px"
+        )
       )
     )
   ),
 
   theme = bs_theme("lumen", version = 5),
 
+  sidebar = sidebar(
+    # - Select measure of deprivation -
+    card(
+      card_header("Choose a measure of deprivation"),
+
+      tags$div(
+        style = "align-items: center;",
+        tags$div(
+          class = "flex-select",
+          style = "display: inline-block; border: none;",
+
+          selectizeInput(
+            "imd_var",
+            "",
+            choices = c(
+              "Population-weighted average score" = "Score",
+              "% of highly deprived neighbourhoods" = "Proportion",
+              "% of people living in the most deprived neighbourhoods" = "Extent",
+              "Income Score" = "Income_Score",
+              "Employment Score" = "Employment_Score",
+              "Education Score" = "Education_Score",
+              "Health Score" = "Health_Score",
+              "Crime Score" = "Crime_Score",
+              "Housing & Access Score" = "Housing_and_Access_Score",
+              "Environment Score" = "Environment_Score"
+            ),
+            options = list(dropdownParent = 'body')
+          )
+        )
+      )
+    ),
+
+    # - Select Local Authorities -
+    card(
+      card_header("Filter Local Authorities"),
+      tags$div(
+        style = "align-items: center;",
+        tags$strong(
+          tags$span("")
+        ),
+        tags$div(
+          class = "flex-select",
+          style = "display: inline-block; border: none;",
+
+          selectizeInput(
+            "select_lad",
+            "",
+            #TODO: Limit LAD choices to the current nation/region
+            choices = sort(lad_names$lad_name),
+            multiple = TRUE,
+            options = list(dropdownParent = 'body')
+          )
+        )
+      )
+    )
+  ),
+
   navset_underline(
     # ---- Tab 1: Interactive Map ----
     nav_panel(
-      "Deprivation in Local Authorities",
-
-      card(
-        tags$div(
-          style = "align-items: center;",
-          tags$strong(
-            tags$span("Choose a measure of deprivation: ")
-          ),
-          tags$div(
-            class = "flex-select",
-            style = "display: inline-block; border: none;",
-
-            selectizeInput(
-              "map_var",
-              "",
-              choices = c(
-                "Population-weighted average score" = "Score",
-                "% of highly deprived neighbourhoods" = "Proportion",
-                "% of people living in the most deprived neighbourhoods" = "Extent",
-                "Income Score" = "Income_Score",
-                "Employment Score" = "Employment_Score",
-                "Education Score" = "Education_Score",
-                "Health Score" = "Health_Score",
-                "Crime Score" = "Crime_Score",
-                "Housing & Access Score" = "Housing_and_Access_Score",
-                "Environment Score" = "Environment_Score"
-              ),
-              options = list(dropdownParent = 'body')
-            )
-          )
-        )
-      ),
+      "Map",
 
       card(
         full_screen = TRUE,
@@ -153,135 +215,12 @@ ui <- page_fillable(
     ),
 
     nav_panel(
-      "Compare Local Authorities",
+      "Compare areas",
 
       card(
-        tags$div(
-          style = "align-items: center;",
-          tags$strong(
-            tags$span("Choose a measure of deprivation: ")
-          ),
-          tags$div(
-            class = "flex-select",
-            style = "display: inline-block; border: none;",
-
-            selectizeInput(
-              "imd_var",
-              "",
-              choices = c("Population-weighted average score" = "Score",
-                          "% of highly deprived neighbourhoods" = "Proportion",
-                          "% of people living in the most deprived neighbourhoods" = "Extent",
-                          "Income Score" = "Income_Score",
-                          "Employment Score" = "Employment_Score",
-                          "Education Score" = "Education_Score",
-                          "Health Score" = "Health_Score",
-                          "Crime Score" = "Crime_Score",
-                          "Housing & Access Score" = "Housing_and_Access_Score",
-                          "Environment Score" = "Environment_Score"),
-              options = list(dropdownParent = 'body')
-            )
-          )
-        )
-      ),
-
-      card(
-        card_header(textOutput("lad_comparison_title")),
+        card_header(textOutput("comparison_title")),
         plotlyOutput("lad_comparison")
       )
-    ),
-
-    # ---- Neighourhood IMD map ----
-    nav_panel(
-      "Deprivation in neighbourhoods",
-
-      layout_column_wrap(
-        width = "200px",
-
-        card(
-          tags$div(
-            style = "align-items: center;",
-            tags$strong(
-              tags$span("Choose a measure of deprivation: ")
-            ),
-            tags$div(
-              class = "flex-select",
-              style = "display: inline-block; border: none;",
-
-              selectizeInput(
-                "neighbourhood_map_var",
-                "",
-                choices = c(
-                  "Overall deprivation" = "IMD_quintile",
-                  "Income" = "Income_quintile",
-                  "Employment" = "Employment_quintile",
-                  "Education" = "Education_quintile",
-                  "Health" = "Health_quintile",
-                  "Crime" = "Crime_quintile",
-                  "Housing & Access" = "Housing_and_Access_quintile",
-                  "Environment" = "Environment_quintile"
-                ),
-                options = list(dropdownParent = 'body')
-              )
-            )
-          )
-        ),
-
-        card(
-          card_header("Choose one or more Local Authorities"),
-          tags$div(
-            style = "align-items: center;",
-            tags$strong(
-              tags$span("")
-            ),
-            tags$div(
-              class = "flex-select",
-              style = "display: inline-block; border: none;",
-
-              selectizeInput(
-                "neighbourhood_lad",
-                "",
-                choices = sort(lad_names$lad_name),
-                multiple = TRUE,
-                options = list(dropdownParent = 'body')
-              )
-            )
-          )
-        )
-      ),
-
-      card(
-        full_screen = TRUE,
-        leafletOutput("neighbourhood_map", height = 600)
-      )
-    ),
-
-    # ---- Tab 4: Correlation Heatmap ----
-    nav_panel("Domains of deprivation",
-              sidebarLayout(
-                sidebarPanel(
-                  helpText("Select the LAD-level domain scores to include in the correlation analysis:"),
-                  checkboxGroupInput("corr_vars", "Variables",
-                                     choices = c("Overall Score" = "Score",
-                                                 "Income Score" = "Income_Score",
-                                                 "Employment Score" = "Employment_Score",
-                                                 "Education Score" = "Education_Score",
-                                                 "Health Score" = "Health_Score",
-                                                 "Crime Score" = "Crime_Score",
-                                                 "Housing & Access Score" = "Housing_and_Access_Score",
-                                                 "Environment Score" = "Environment_Score"),
-                                     selected = c("Score", "Income_Score", "Employment_Score", "Education_Score", "Health_Score"))
-                ),
-                mainPanel(
-                  plotOutput("corrHeatmap")
-                )
-              )
-    ),
-
-    # ---- Tab 5: Data Table ----
-    nav_panel("Data Table",
-              fluidPage(
-                DTOutput("dataTable")
-              )
     )
   )
 )
@@ -290,6 +229,40 @@ ui <- page_fillable(
 # Define Server Logic
 # ---------------------
 server <- function(input, output, session) {
+
+  #TODO: Synchronise the LAD choices and deprivation variable choices
+  observeEvent(input$lad_or_lsoa, {
+    if (input$lad_or_lsoa == "Local Authorities") {
+      updateSelectInput(
+        session,
+        "imd_var",
+        choices = imd_lad_variables,
+        selected = imd_lad_variables[1]
+      )
+    } else {
+      updateSelectInput(
+        session,
+        "imd_var",
+        choices = imd_lsoa_variables,
+        selected = imd_lsoa_variables[1]
+      )
+    }
+  })
+
+  observeEvent(input$region_filter, {
+    if(input$region_filter == "England") {
+      new_lads <- lad_names$lad_name[str_detect(lad_names$lad_code, "^E")]
+    } else {
+      new_lads <- lad_names$lad_name[lad_names$region_name == input$region_filter]
+    }
+    print(new_lads)
+
+    updateSelectInput(
+      session,
+      "select_lad",
+      choices = sort(new_lads)
+    )
+  })
 
   # --- Reactive subset for LAD-level data based on Region filter ---
   filtered_lad <- reactive({
@@ -301,7 +274,7 @@ server <- function(input, output, session) {
   })
 
   # --- Local Authority map ---
-  output$map <- renderLeaflet({
+  draw_lad_map <- reactive({
     # Ensure spatial boundaries exist
     req(nrow(lad_boundaries) > 0)
 
@@ -313,11 +286,11 @@ server <- function(input, output, session) {
     }
 
     # Create a color palette based on the selected variable
-    pal <- colorNumeric("YlOrRd", domain = boundaries[[input$map_var]])
+    pal <- colorNumeric("YlOrRd", domain = boundaries[[input$imd_var]])
 
     # Make a labelFormat function that formats the labels as percentages if the variable is a proportion, otherwise as numeric
     formatNumberOrPercentage <- function(type = "numeric", x) {
-      if (input$map_var %in% c("Proportion", "Extent")) {
+      if (input$imd_var %in% c("Proportion", "Extent")) {
         scales::percent(x, accuracy = 0.1)
       } else {
         scales::number(x, accuracy = 0.1)
@@ -327,7 +300,7 @@ server <- function(input, output, session) {
     leaflet(boundaries) %>%
       addTiles() %>%
       addPolygons(
-        fillColor = ~pal(get(input$map_var)),
+        fillColor = ~pal(get(input$imd_var)),
         weight = 1,
         opacity = 1,
         color = "white",
@@ -339,17 +312,90 @@ server <- function(input, output, session) {
           dashArray = "",
           fillOpacity = 0.7,
           bringToFront = TRUE),
-        label = ~paste0(lad_code, ": ", round(get(input$map_var), 2))
+        label = ~paste0(lad_code, ": ", round(get(input$imd_var), 2))
       ) %>%
-      addLegend(pal = pal, values = ~get(input$map_var),
-                opacity = 0.7, title = imd_lad_variables_name(input$map_var),
+      addLegend(pal = pal, values = ~get(input$imd_var),
+                opacity = 0.7, title = variables_name(input$imd_var, imd_lad_variables),
                 labFormat = formatNumberOrPercentage,
                 position = "bottomright")
   })
 
+  draw_neighbourhood_map <- reactive({
+    # Ensure spatial boundaries exist
+    req(nrow(lsoa_boundaries) > 0)
+
+    # Filter spatial data if a Local Authority is selected
+    if (length(input$select_lad) > 0) {
+      region_boundaries <- lad_boundaries %>% filter(region_name == input$region_filter)
+
+      lad_codes <- lad_names$lad_code[lad_names$lad_name %in% input$select_lad]
+      boundaries <- lsoa_boundaries %>% filter(lad_code %in% lad_codes)
+
+      selected_lad_boundaries <- lad_boundaries %>% filter(ltla21_name %in% input$select_lad)
+    } else {
+      region_boundaries <- lad_boundaries
+      boundaries <- lsoa_boundaries
+      selected_lad_boundaries <- lad_boundaries
+    }
+
+    # Create a color palette based on the selected variable
+    # pal <- colorNumeric("YlOrRd", domain = boundaries[[input$neighbourhood_imd_var]])
+
+    # Select the variable in boundaries based on what the user selected in neighbourhood_imd_var and filter values that are <= 2
+    filtered_boundaries <-
+      boundaries %>%
+      filter(get(input$imd_var) <= 2)
+
+    filtered_boundaries |>
+      leaflet() %>%
+      addTiles() %>%
+
+      # Add LAD boundaries
+      addPolygons(
+        data = selected_lad_boundaries,
+        fillColor = "transparent",
+        weight = 2,
+        opacity = 1,
+        color = "black",
+        fillOpacity = 0.5
+      ) %>%
+
+      # Add 20% most deprived LSOAs
+      addPolygons(
+        fillColor = "red",
+        weight = 1,
+        opacity = 0.5,
+        color = "white",
+        dashArray = "3",
+        fillOpacity = 0.7,
+        highlight = highlightOptions(
+          weight = 3,
+          color = "#666",
+          dashArray = "",
+          fillOpacity = 0.7,
+          bringToFront = TRUE),
+        label = ~paste0(lsoa11_name, ": ", round(get(input$imd_var), 2))
+      )
+  })
+
+  # ---- Render maps ----
+  output$map <- renderLeaflet({
+    if (input$lad_or_lsoa == "Local Authorities") {
+      draw_lad_map()
+    } else {
+      draw_neighbourhood_map()
+    }
+  })
+
   # ---- LA comparison ----
-  output$lad_comparison_title <- renderText({
-    str_glue("{imd_lad_variables_name(input$imd_var)} for Local Authorities in {input$region_filter}")
+  output$comparison_title <- renderText({
+    if (input$lad_or_lsoa == "Local Authorities") {
+      vars <- variables_name(input$imd_var, imd_lad_variables)
+    } else {
+      vars <- variables_name(input$imd_var, imd_lsoa_variables)
+    }
+
+    str_glue("{vars} for {input$lad_or_lsoa} in {input$region_filter}")
   })
 
   output$lad_comparison <- renderPlotly({
@@ -369,7 +415,7 @@ server <- function(input, output, session) {
       ggplot(aes(x = reorder(lad_name, .data[[input$imd_var]]), y = .data[[input$imd_var]])) +
       geom_col(aes(
         fill = region_name,
-        text = str_glue("{imd_lad_variables_name(input$imd_var)} in {lad_name}: {formatNumberOrPercentage(.data[[input$imd_var]])}")
+        text = str_glue("{variables_name(input$imd_var)} in {lad_name}: {formatNumberOrPercentage(.data[[input$imd_var]])}")
       )) +
       coord_flip() +
       scale_y_continuous(labels = formatNumberOrPercentage) +
@@ -380,7 +426,7 @@ server <- function(input, output, session) {
       ) +
       labs(
         x = NULL,
-        y = imd_lad_variables_name(input$imd_var)
+        y = variables_name(input$imd_var)
       )
 
     ggplotly(plt, height = nrow(data) * 15, tooltip = "text") |>
@@ -419,95 +465,6 @@ server <- function(input, output, session) {
         margin = list(t = 50)  # Reduce top margin to bring plot closer to legend
       )
   })
-
-  # ---- Neighourhood map ----
-  output$neighbourhood_map <- renderLeaflet({
-    # Ensure spatial boundaries exist
-    req(nrow(lsoa_boundaries) > 0)
-
-    # Filter spatial data if a Local Authority is selected
-    if (length(input$neighbourhood_lad) > 0) {
-      lad_codes <- lad_names$lad_code[lad_names$lad_name %in% input$neighbourhood_lad]
-      boundaries <- lsoa_boundaries %>% filter(lad_code %in% lad_codes)
-      selected_lad_boundaries <- lad_boundaries %>% filter(ltla21_name %in% input$neighbourhood_lad)
-    } else {
-      boundaries <- lsoa_boundaries
-      selected_lad_boundaries <- lad_boundaries
-    }
-
-    # Create a color palette based on the selected variable
-    # pal <- colorNumeric("YlOrRd", domain = boundaries[[input$neighbourhood_map_var]])
-
-    # Select the variable in boundaries based on what the user selected in neighbourhood_map_var and filter values that are <= 2
-    filtered_boundaries <-
-      boundaries %>%
-      filter(get(input$neighbourhood_map_var) <= 2)
-
-    filtered_boundaries |>
-      leaflet() %>%
-      addTiles() %>%
-
-      # Add LAD boundaries
-      addPolygons(
-        data = selected_lad_boundaries,
-        fillColor = "transparent",
-        weight = 2,
-        opacity = 1,
-        color = "black",
-        fillOpacity = 0.5
-      ) %>%
-
-      # Add 20% most deprived LSOAs
-      addPolygons(
-        fillColor = "red",
-        weight = 1,
-        opacity = 0.5,
-        color = "white",
-        dashArray = "3",
-        fillOpacity = 0.7,
-        highlight = highlightOptions(
-          weight = 3,
-          color = "#666",
-          dashArray = "",
-          fillOpacity = 0.7,
-          bringToFront = TRUE),
-        label = ~paste0(lad_code, ": ", round(get(input$neighbourhood_map_var), 2))
-      )
-    })
-
-  # --- Scatter Plot Output ---
-  output$scatterPlot <- renderPlot({
-    data <- filtered_lad()
-    ggplot(data, aes_string(x = input$x_var, y = input$y_var)) +
-      geom_point(color = "blue", size = 3, alpha = 0.6) +
-      labs(x = input$x_var,
-           y = input$y_var,
-           title = paste("Scatter Plot:", input$x_var, "vs", input$y_var)) +
-      theme_minimal()
-  })
-
-  # --- Correlation Heatmap ---
-  output$corrHeatmap <- renderPlot({
-    req(input$corr_vars)
-    data <- filtered_lad()[, input$corr_vars, drop = FALSE]
-    corr_matrix <- cor(data, use = "complete.obs")
-    # Reshape for ggplot2
-    corr_df <- melt(corr_matrix)
-    ggplot(corr_df, aes(Var1, Var2, fill = value)) +
-      geom_tile() +
-      scale_fill_gradient2(low = "blue", high = "red", mid = "white",
-                           midpoint = 0, limit = c(-1, 1), space = "Lab",
-                           name = "Correlation") +
-      theme_minimal() +
-      labs(title = "Correlation Heatmap", x = "", y = "") +
-      theme(axis.text.x = element_text(angle = 45, vjust = 1, size = 12, hjust = 1))
-  })
-
-  # --- Data Table Output ---
-  output$dataTable <- renderDT({
-    datatable(imd_lad, options = list(pageLength = 10))
-  })
-
 }
 
 # ---------------------

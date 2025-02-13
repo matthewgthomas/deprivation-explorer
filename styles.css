@@ -1,25 +1,29 @@
-#region_filter {
+#region_filter,
+#lad_or_lsoa {
   appearance: none;
   border: 0;
   outline: 0;
   padding: 0 1rem;
-  width:300px;
+  width: auto;
   font: inherit;
   color: blue;
   cursor: pointer;
   box-shadow: none;
 }
 
-#region_filter::-ms-expand {
+#region_filter::-ms-expand,
+#lad_or_lsoa::-ms-expand {
   display: none;
 }
 
-#region_filter::hover {
+#region_filter:hover,
+#lad_or_lsoa:hover {
   text-decoration: underline;
 }
 
-#region_filter:hover {
-  text-decoration: underline;
+.flex-select {
+  display: inline-block;
+  border: none;
 }
 
 /* Custom arrow */
