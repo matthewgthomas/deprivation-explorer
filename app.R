@@ -219,7 +219,7 @@ ui <- page_sidebar(
 
       card(
         card_header(textOutput("comparison_title")),
-        plotlyOutput("lad_comparison")
+        plotlyOutput("area_comparison")
       )
     )
   )
@@ -264,8 +264,8 @@ server <- function(input, output, session) {
     )
   })
 
-  # --- Reactive subset for LAD-level data based on Region filter ---
-  filtered_lad <- reactive({
+  # ---- Reactive subset for LAD-level data based on Region filter ----
+  filtered_lads_in_region <- reactive({
     if (input$region_filter == "England") {
       imd_lad
     } else {
@@ -273,7 +273,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # --- Local Authority map ---
+  # ---- Local Authority map ----
   draw_lad_map <- reactive({
     # Ensure spatial boundaries exist
     req(nrow(lad_boundaries) > 0)
@@ -320,6 +320,7 @@ server <- function(input, output, session) {
                 position = "bottomright")
   })
 
+  # ---- Neighbourhood map ----
   draw_neighbourhood_map <- reactive({
     # Ensure spatial boundaries exist
     req(nrow(lsoa_boundaries) > 0)
@@ -387,7 +388,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # ---- LA comparison ----
+  # ---- Comparison tab title ----
   output$comparison_title <- renderText({
     if (input$lad_or_lsoa == "Local Authorities") {
       vars <- variables_name(input$imd_var, imd_lad_variables)
@@ -398,8 +399,13 @@ server <- function(input, output, session) {
     str_glue("{vars} for {input$lad_or_lsoa} in {input$region_filter}")
   })
 
-  output$lad_comparison <- renderPlotly({
-    data <- filtered_lad()
+  # ---- Local Authority comparison ----
+  render_lad_comparison <- reactive({
+    # Fetch the Local Authorities in the selected region
+    data <- filtered_lads_in_region()
+
+    # Highlight user-selected Local Authorities
+    data$highlight <- ifelse(data$lad_name %in% input$select_lad, "Selected", "Not Selected")
 
     # Format the labels as percentages if the variable is a proportion, otherwise as numeric
     formatNumberOrPercentage <- function(x) {
@@ -415,18 +421,20 @@ server <- function(input, output, session) {
       ggplot(aes(x = reorder(lad_name, .data[[input$imd_var]]), y = .data[[input$imd_var]])) +
       geom_col(aes(
         fill = region_name,
-        text = str_glue("{variables_name(input$imd_var)} in {lad_name}: {formatNumberOrPercentage(.data[[input$imd_var]])}")
-      )) +
+        colour = highlight,
+        text = str_glue("{variables_name(input$imd_var, imd_lad_variables)} in {lad_name}: {formatNumberOrPercentage(.data[[input$imd_var]])}")
+      ), show.legend = FALSE) +
       coord_flip() +
       scale_y_continuous(labels = formatNumberOrPercentage) +
+      scale_color_manual(values = c("Selected" = "black", "Not Selected" = "transparent")) +
       scale_fill_brewer(palette = "Pastel1") +
       theme_minimal() +
       theme(
-        legend.position = "top"
+        legend.position = "none"
       ) +
       labs(
         x = NULL,
-        y = variables_name(input$imd_var)
+        y = variables_name(input$imd_var, imd_lad_variables)
       )
 
     ggplotly(plt, height = nrow(data) * 15, tooltip = "text") |>
@@ -453,17 +461,35 @@ server <- function(input, output, session) {
         )
       ) |>
       layout(
-        showlegend = if_else(input$region_filter == "England", TRUE, FALSE),
-        legend = list(
-          orientation = "h",
-          x = 0,
-          xanchor = "center",
-          y = 1,
-          yanchor = "bottom",
-          title = NA
-        ),
-        margin = list(t = 50)  # Reduce top margin to bring plot closer to legend
+        showlegend = FALSE  #if_else(input$region_filter == "England", TRUE, FALSE),
+        # legend = list(
+        #   orientation = "h",
+        #   x = 0,
+        #   xanchor = "center",
+        #   y = 1,
+        #   yanchor = "bottom",
+        #   title = NA
+        # ),
+        # margin = list(t = 50)  # Reduce top margin to bring plot closer to legend
       )
+  })
+
+  # ---- Neighbourhood comparison ----
+  render_neighbourhood_comparison <- reactive({
+    # Ask the user to pick a region or Local Authority first
+    # otherwise the chart will be too big
+    if (length(input$select_lad) == 0) {
+      return(NULL)
+    }
+  })
+
+  # ---- Comparison tab plot ----
+  output$area_comparison <- renderPlotly({
+    if (input$lad_or_lsoa == "Local Authorities") {
+      render_lad_comparison()
+    } else {
+      render_neighbourhood_comparison()
+    }
   })
 }
 
