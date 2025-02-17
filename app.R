@@ -1,4 +1,4 @@
-# app.R
+# Deprivation Explorer
 
 # Load required packages
 library(shiny)
@@ -6,78 +6,24 @@ library(bslib)
 library(leaflet)
 library(dplyr)
 library(ggplot2)
+library(readr)
 library(stringr)
 library(plotly)
-library(DT)
+# library(DT)
 library(sf)
-library(shinythemes)
-library(reshape2)
+# library(shinythemes)
+# library(reshape2)
 library(geographr)
-library(IMD)
+# library(IMD)
 
-# ---------------------
-# Load Data
-# ---------------------
-# ---- Local Authority data ----
-lad_names <- boundaries_ltla21 |>
-  st_drop_geometry() |>
-  rename(lad_code = ltla21_code, lad_name = ltla21_name) |>
-  left_join(
-    lookup_ltla21_region21 |>
-      select(lad_code = ltla21_code, region_name = region21_name)
-  )
+#
+# Load data ----
+#
+imd_lad <- read_csv("data/imd_lad.csv")
+imd_lsoa <- read_csv("data/imd_lsoa.csv")
 
-# IMD for Local Authority Districts (LAD)
-imd_lad <- IMD::imd_england_lad |>
-  left_join(
-    lookup_ltla21_region21 |>
-      select(lad_code = ltla21_code, region_name = region21_name)
-  ) |>
-  left_join(lad_names)
-
-# Load LAD boundaries as an sf object (GeoJSON or shapefile)
-# (Replace "lad_boundaries.geojson" with your actual file)
-lad_boundaries <- boundaries_ltla21 |>
-  filter(str_detect(ltla21_code, "^E")) |>
-  rename(lad_code = ltla21_code)
-
-# Merge the LAD-level IMD data with spatial boundaries based on a common code.
-# (Make sure the field names match; here we assume both have 'lad_code'.)
-lad_boundaries <- left_join(lad_boundaries, imd_lad, by = "lad_code")
-
-# ---- Neighbourhood-level data ----
-lsoa_names <- boundaries_lsoa11 |>
-  st_drop_geometry() |>
-  rename(lsoa_code = lsoa11_code, lsoa_name = lsoa11_name) |>
-  left_join(
-    lookup_lsoa11_ltla21 |>
-      select(lsoa_code = lsoa11_code, lad_code = ltla21_code, lad_name = ltla21_name)
-  ) |>
-  left_join(
-    lookup_ltla21_region21 |>
-      select(lad_code = ltla21_code, region_name = region21_name)
-  )
-
-# Calculate quintiles
-imd_lsoa <- IMD::imd_england_lsoa |>
-  left_join(lsoa_names) |>
-  left_join(ruc11_lsoa11, by = join_by(lsoa_code == lsoa11_code))
-  # mutate(
-  #   IMD_quintile = ceiling(IMD_decile / 2),
-  #   Income_quintile = ceiling(Income_decile / 2),
-  #   Employment_quintile = ceiling(Employment_decile / 2),
-  #   Education_quintile = ceiling(Education_decile / 2),
-  #   Health_quintile = ceiling(Health_decile / 2),
-  #   Crime_quintile = ceiling(Crime_decile / 2),
-  #   Housing_and_Access_quintile = ceiling(Housing_and_Access_decile / 2),
-  #   Environment_quintile = ceiling(Environment_decile / 2)
-  # )
-  # select(lsoa_code, lsoa_name, lad_code, lad_name, ends_with("quintile"), ends_with("rank"))
-
-# Show only 20% most deprived areas on the map
-lsoa_boundaries <-
-  boundaries_lsoa11 |>
-  left_join(imd_lsoa, by = join_by(lsoa11_code == lsoa_code))
+lad_boundaries <- read_sf("data/lad_boundaries.geojson")
+lsoa_boundaries <- read_sf("data/lsoa_boundaries.geojson")
 
 # ---- Dropdown options ----
 imd_lad_variables <-
@@ -111,9 +57,7 @@ variables_name <- function(value, variables) {
   names(variables)[match(value, variables)]
 }
 
-# ---------------------
-# Define UI
-# ---------------------
+# Define UI ----
 ui <- page_sidebar(
   includeCSS("styles.css"),
 
@@ -192,7 +136,6 @@ ui <- page_sidebar(
           selectizeInput(
             "select_lad",
             "",
-            #TODO: Limit LAD choices to the current nation/region
             choices = sort(lad_names$lad_name),
             multiple = TRUE,
             options = list(dropdownParent = 'body')
@@ -224,9 +167,7 @@ ui <- page_sidebar(
   )
 )
 
-# ---------------------
-# Define Server Logic
-# ---------------------
+# Server ----
 server <- function(input, output, session) {
 
   # ---- Track user selections ----
@@ -342,7 +283,7 @@ server <- function(input, output, session) {
           dashArray = "",
           fillOpacity = 0.7,
           bringToFront = TRUE),
-        label = ~str_glue("{variables_name(imd_var, imd_lad_variables)} in {ltla21_name}: {formatNumberOrPercentage(x = get(imd_var))}")
+        label = ~str_glue("{variables_name(imd_var, imd_lad_variables)} in {lad_name}: {formatNumberOrPercentage(x = get(imd_var))}")
         # label = ~paste0(lad_name, ": ", round(get(imd_var), 2))
       ) %>%
       addLegend(pal = pal, values = ~get(imd_var),
@@ -373,7 +314,7 @@ server <- function(input, output, session) {
     if (length(input$select_lad) > 0) {
       lad_codes <- lad_names$lad_code[lad_names$lad_name %in% input$select_lad]
       lsoas_in_region <- lsoas_in_region %>% filter(lad_code %in% lad_codes)
-      lads_in_region <- lad_boundaries %>% filter(ltla21_name %in% input$select_lad)
+      lads_in_region <- lad_boundaries %>% filter(lad_name %in% input$select_lad)
     }
 
     # Select the variable in boundaries based on what the user selected in neighbourhood_imd_var and filter values that are <= 2
@@ -617,7 +558,5 @@ server <- function(input, output, session) {
   })
 }
 
-# ---------------------
-# Run the App
-# ---------------------
+# Run the app ----
 shinyApp(ui, server)
