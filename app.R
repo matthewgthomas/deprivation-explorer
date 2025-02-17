@@ -409,7 +409,8 @@ server <- function(input, output, session) {
           dashArray = "",
           fillOpacity = 0.7,
           bringToFront = TRUE),
-        label = ~paste0(lsoa11_name, ": ", round(get(imd_var), 2))
+        label = ~str_glue("{lsoa11_name} is in {tolower(variables_name(imd_var, imd_lsoa_variables))} decile {get(imd_var)}")
+        # label = ~paste0(lsoa11_name, ": ", round(get(imd_var), 2))
       )
   })
 
