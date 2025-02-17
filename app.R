@@ -61,17 +61,17 @@ lsoa_names <- boundaries_lsoa11 |>
 # Calculate quintiles
 imd_lsoa <- IMD::imd_england_lsoa |>
   left_join(lsoa_names) |>
-  left_join(ruc11_lsoa11, by = join_by(lsoa_code == lsoa11_code)) |>
-  mutate(
-    IMD_quintile = ceiling(IMD_decile / 2),
-    Income_quintile = ceiling(Income_decile / 2),
-    Employment_quintile = ceiling(Employment_decile / 2),
-    Education_quintile = ceiling(Education_decile / 2),
-    Health_quintile = ceiling(Health_decile / 2),
-    Crime_quintile = ceiling(Crime_decile / 2),
-    Housing_and_Access_quintile = ceiling(Housing_and_Access_decile / 2),
-    Environment_quintile = ceiling(Environment_decile / 2)
-  )
+  left_join(ruc11_lsoa11, by = join_by(lsoa_code == lsoa11_code))
+  # mutate(
+  #   IMD_quintile = ceiling(IMD_decile / 2),
+  #   Income_quintile = ceiling(Income_decile / 2),
+  #   Employment_quintile = ceiling(Employment_decile / 2),
+  #   Education_quintile = ceiling(Education_decile / 2),
+  #   Health_quintile = ceiling(Health_decile / 2),
+  #   Crime_quintile = ceiling(Crime_decile / 2),
+  #   Housing_and_Access_quintile = ceiling(Housing_and_Access_decile / 2),
+  #   Environment_quintile = ceiling(Environment_decile / 2)
+  # )
   # select(lsoa_code, lsoa_name, lad_code, lad_name, ends_with("quintile"), ends_with("rank"))
 
 # Show only 20% most deprived areas on the map
@@ -170,18 +170,7 @@ ui <- page_sidebar(
           selectizeInput(
             "imd_var",
             "",
-            choices = c(
-              "Population-weighted average score" = "Score",
-              "% of highly deprived neighbourhoods" = "Proportion",
-              "% of people living in the most deprived neighbourhoods" = "Extent",
-              "Income Score" = "Income_Score",
-              "Employment Score" = "Employment_Score",
-              "Education Score" = "Education_Score",
-              "Health Score" = "Health_Score",
-              "Crime Score" = "Crime_Score",
-              "Housing & Access Score" = "Housing_and_Access_Score",
-              "Environment Score" = "Environment_Score"
-            ),
+            choices = imd_lad_variables,
             options = list(dropdownParent = 'body')
           )
         )
@@ -240,7 +229,13 @@ ui <- page_sidebar(
 # ---------------------
 server <- function(input, output, session) {
 
-  #TODO: Synchronise the LAD choices and deprivation variable choices
+  # ---- Track user selections ----
+  user_selections <- reactiveValues(
+    selected_lads = NULL,
+    imd_var = imd_lad_variables[1]
+  )
+
+  # ---- Update available IMD variables based on whether user is viewing LADs or neighbourhoods ----
   observeEvent(input$lad_or_lsoa, {
     if (input$lad_or_lsoa == "Local Authorities") {
       updateSelectInput(
@@ -249,6 +244,9 @@ server <- function(input, output, session) {
         choices = imd_lad_variables,
         selected = imd_lad_variables[1]
       )
+
+      user_selections$imd_var <- imd_lad_variables[1]
+
     } else {
       updateSelectInput(
         session,
@@ -256,22 +254,27 @@ server <- function(input, output, session) {
         choices = imd_lsoa_variables,
         selected = imd_lsoa_variables[1]
       )
+
+      user_selections$imd_var <- imd_lsoa_variables[1]
     }
   })
 
+  # ---- Update LAD dropdown based on region selection ----
   observeEvent(input$region_filter, {
     if(input$region_filter == "England") {
       new_lads <- lad_names$lad_name[str_detect(lad_names$lad_code, "^E")]
     } else {
       new_lads <- lad_names$lad_name[lad_names$region_name == input$region_filter]
     }
-    print(new_lads)
 
     updateSelectInput(
       session,
       "select_lad",
       choices = sort(new_lads)
     )
+
+    # Reset user-selected LADs
+    user_selections$selected_lads <- NULL
   })
 
   # ---- Reactive subset for LAD-level data based on Region filter ----
@@ -288,6 +291,8 @@ server <- function(input, output, session) {
     # Ensure spatial boundaries exist
     req(nrow(lad_boundaries) > 0)
 
+    imd_var <- user_selections$imd_var
+
     # Filter spatial data if a region is selected
     if (input$region_filter != "England") {
       boundaries <- lad_boundaries %>% filter(region_name == input$region_filter)
@@ -295,12 +300,18 @@ server <- function(input, output, session) {
       boundaries <- lad_boundaries
     }
 
+    # Highlight user-selected Local Authorities
+    boundaries$highlight <- ifelse(boundaries$lad_name %in% input$select_lad, "Highlighted", "Not highlighted")
+
     # Create a color palette based on the selected variable
-    pal <- colorNumeric("YlOrRd", domain = boundaries[[input$imd_var]])
+    pal <- colorNumeric("YlOrRd", domain = boundaries[[imd_var]])
+
+    # Create a color palette for highlighted Local Authorities
+    pal_highlight <- colorFactor(c("black", "white"), domain = boundaries$highlight)
 
     # Make a labelFormat function that formats the labels as percentages if the variable is a proportion, otherwise as numeric
     formatNumberOrPercentage <- function(type = "numeric", x) {
-      if (input$imd_var %in% c("Proportion", "Extent")) {
+      if (imd_var %in% c("Proportion", "Extent")) {
         scales::percent(x, accuracy = 0.1)
       } else {
         scales::number(x, accuracy = 0.1)
@@ -310,52 +321,56 @@ server <- function(input, output, session) {
     leaflet(boundaries) %>%
       addTiles() %>%
       addPolygons(
-        fillColor = ~pal(get(input$imd_var)),
-        weight = 1,
+        fillColor = ~pal(get(imd_var)),
+        weight = ~ifelse(highlight == "Highlighted", 3, 1),  # Change weight based on highlight
         opacity = 1,
-        color = "white",
-        dashArray = "3",
-        fillOpacity = 0.7,
+        color = ~pal_highlight(highlight),
+        dashArray = "",
+        fillOpacity = ~ifelse(highlight == "Highlighted", 1, 0.7),  # Change fill opacity based on highlight
         highlight = highlightOptions(
           weight = 3,
           color = "#666",
           dashArray = "",
           fillOpacity = 0.7,
           bringToFront = TRUE),
-        label = ~paste0(lad_code, ": ", round(get(input$imd_var), 2))
+        label = ~str_glue("{variables_name(imd_var, imd_lad_variables)} in {ltla21_name}: {formatNumberOrPercentage(x = get(imd_var))}")
+        # label = ~paste0(lad_name, ": ", round(get(imd_var), 2))
       ) %>%
-      addLegend(pal = pal, values = ~get(input$imd_var),
-                opacity = 0.7, title = variables_name(input$imd_var, imd_lad_variables),
+      addLegend(pal = pal, values = ~get(imd_var),
+                opacity = 0.7, title = variables_name(imd_var, imd_lad_variables),
                 labFormat = formatNumberOrPercentage,
                 position = "bottomright")
   })
 
   # ---- Neighbourhood map ----
   draw_neighbourhood_map <- reactive({
+    imd_var <- user_selections$imd_var
+
     # Ensure spatial boundaries exist
     req(nrow(lsoa_boundaries) > 0)
 
-    # Filter spatial data if a Local Authority is selected
-    if (length(input$select_lad) > 0) {
-      region_boundaries <- lad_boundaries %>% filter(region_name == input$region_filter)
+    # Filter spatial data if a region is selected
+    if (input$region_filter != "England") {
+      lsoas_in_region <- lsoa_boundaries %>% filter(region_name == input$region_filter)
+      lads_in_region <- lad_boundaries %>% filter(region_name == input$region_filter)
 
-      lad_codes <- lad_names$lad_code[lad_names$lad_name %in% input$select_lad]
-      boundaries <- lsoa_boundaries %>% filter(lad_code %in% lad_codes)
-
-      selected_lad_boundaries <- lad_boundaries %>% filter(ltla21_name %in% input$select_lad)
     } else {
-      region_boundaries <- lad_boundaries
-      boundaries <- lsoa_boundaries
-      selected_lad_boundaries <- lad_boundaries
+      lsoas_in_region <- lsoa_boundaries
+      lads_in_region <- lad_boundaries
+
     }
 
-    # Create a color palette based on the selected variable
-    # pal <- colorNumeric("YlOrRd", domain = boundaries[[input$neighbourhood_imd_var]])
+    # Filter spatial data if a Local Authority is selected
+    if (length(input$select_lad) > 0) {
+      lad_codes <- lad_names$lad_code[lad_names$lad_name %in% input$select_lad]
+      lsoas_in_region <- lsoas_in_region %>% filter(lad_code %in% lad_codes)
+      lads_in_region <- lad_boundaries %>% filter(ltla21_name %in% input$select_lad)
+    }
 
     # Select the variable in boundaries based on what the user selected in neighbourhood_imd_var and filter values that are <= 2
     filtered_boundaries <-
-      boundaries %>%
-      filter(get(input$imd_var) <= 2)
+      lsoas_in_region %>%
+      filter(get(imd_var) <= 2)
 
     filtered_boundaries |>
       leaflet() %>%
@@ -363,7 +378,7 @@ server <- function(input, output, session) {
 
       # Add LAD boundaries
       addPolygons(
-        data = selected_lad_boundaries,
+        data = lads_in_region,
         fillColor = "transparent",
         weight = 2,
         opacity = 1,
@@ -385,7 +400,7 @@ server <- function(input, output, session) {
           dashArray = "",
           fillOpacity = 0.7,
           bringToFront = TRUE),
-        label = ~paste0(lsoa11_name, ": ", round(get(input$imd_var), 2))
+        label = ~paste0(lsoa11_name, ": ", round(get(imd_var), 2))
       )
   })
 
@@ -411,6 +426,8 @@ server <- function(input, output, session) {
 
   # ---- Local Authority comparison ----
   render_lad_comparison <- reactive({
+    imd_var <- user_selections$imd_var
+
     # Fetch the Local Authorities in the selected region
     data <- filtered_lads_in_region()
 
@@ -419,7 +436,7 @@ server <- function(input, output, session) {
 
     # Format the labels as percentages if the variable is a proportion, otherwise as numeric
     formatNumberOrPercentage <- function(x) {
-      if (input$imd_var %in% c("Proportion", "Extent")) {
+      if (imd_var %in% c("Proportion", "Extent")) {
         scales::percent(x, accuracy = 0.1)
       } else {
         scales::number(x, accuracy = 0.1)
@@ -428,11 +445,11 @@ server <- function(input, output, session) {
 
     plt <- data |>
       na.omit() |>
-      ggplot(aes(x = reorder(lad_name, .data[[input$imd_var]]), y = .data[[input$imd_var]])) +
+      ggplot(aes(x = reorder(lad_name, .data[[imd_var]]), y = .data[[imd_var]])) +
       geom_col(aes(
         fill = region_name,
         colour = highlight,
-        text = str_glue("{variables_name(input$imd_var, imd_lad_variables)} in {lad_name}: {formatNumberOrPercentage(.data[[input$imd_var]])}")
+        text = str_glue("{variables_name(imd_var, imd_lad_variables)} in {lad_name}: {formatNumberOrPercentage(.data[[imd_var]])}")
       ), show.legend = FALSE) +
       coord_flip() +
       scale_y_continuous(labels = formatNumberOrPercentage) +
@@ -444,7 +461,7 @@ server <- function(input, output, session) {
       ) +
       labs(
         x = NULL,
-        y = variables_name(input$imd_var, imd_lad_variables)
+        y = variables_name(imd_var, imd_lad_variables)
       )
 
     ggplotly(plt, height = nrow(data) * 15, tooltip = "text") |>
@@ -486,6 +503,7 @@ server <- function(input, output, session) {
 
   # ---- Neighbourhood comparison ----
   render_neighbourhood_comparison <- reactive({
+    imd_var <- user_selections$imd_var
     imd_lsoa_filtered <- imd_lsoa
 
     # Fetch the neighbourhoods in the selected Local Authorities
@@ -501,7 +519,7 @@ server <- function(input, output, session) {
     # split by rural-urban classification, for the whole of England
     imd_national_summary <-
       imd_lsoa |>
-      group_by(.data[[input$imd_var]], classification) |>
+      group_by(.data[[imd_var]], classification) |>
       summarise(n = n()) |>
       ungroup() |>
       group_by(classification) |>
@@ -512,7 +530,7 @@ server <- function(input, output, session) {
     # split by rural-urban classification, for the selected region and LADs
     imd_lsoa_filtered_summary <-
       imd_lsoa_filtered |>
-      group_by(region_name, .data[[input$imd_var]], classification) |>
+      group_by(region_name, .data[[imd_var]], classification) |>
       summarise(n = n()) |>
       ungroup() |>
       group_by(classification) |>
@@ -522,11 +540,11 @@ server <- function(input, output, session) {
     # Proportion of LSOAs in each IMD decile, split by rural-urban classification
     plt <-
       imd_lsoa_filtered_summary |>
-      ggplot(aes(x = .data[[input$imd_var]], y = prop)) +
+      ggplot(aes(x = .data[[imd_var]], y = prop)) +
       geom_col(
         aes(
           fill = region_name,
-          text = str_glue("{scales::comma(n)} ({scales::percent(prop, accuracy = 0.1)}) neighbourhoods in {tolower(classification)}s in {region_name} \nare in {tolower(variables_name(input$imd_var, imd_lsoa_variables))} decile {.data[[input$imd_var]]}")
+          text = str_glue("{scales::comma(n)} ({scales::percent(prop, accuracy = 0.1)}) neighbourhoods in {tolower(classification)}s in {region_name} \nare in {tolower(variables_name(imd_var, imd_lsoa_variables))} decile {.data[[imd_var]]}")
         ),
         position = "stack",
         show.legend = FALSE
@@ -534,7 +552,7 @@ server <- function(input, output, session) {
       geom_point(
         data = imd_national_summary,
         aes(
-          text = str_glue("{scales::comma(n)} ({scales::percent(prop, accuracy = 0.1)}) neighbourhoods in {tolower(classification)}s in England \nare in {tolower(variables_name(input$imd_var, imd_lsoa_variables))} decile {.data[[input$imd_var]]}")
+          text = str_glue("{scales::comma(n)} ({scales::percent(prop, accuracy = 0.1)}) neighbourhoods in {tolower(classification)}s in England \nare in {tolower(variables_name(imd_var, imd_lsoa_variables))} decile {.data[[imd_var]]}")
         )
       ) +
       coord_flip() +
@@ -547,7 +565,7 @@ server <- function(input, output, session) {
         legend.position = "none"
       ) +
       labs(
-        x = variables_name(input$imd_var, imd_lsoa_variables),
+        x = variables_name(imd_var, imd_lsoa_variables),
         y = "Proportion of neighbourhoods"
       )
 
