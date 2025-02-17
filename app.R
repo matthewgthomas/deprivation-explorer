@@ -235,6 +235,15 @@ server <- function(input, output, session) {
     imd_var = imd_lad_variables[1]
   )
 
+  # ---- Update user selections ----
+  observeEvent(input$imd_var, {
+    user_selections$imd_var <- input$imd_var
+  })
+
+  observeEvent(input$select_lad, {
+    user_selections$selected_lads <- input$select_lad
+  })
+
   # ---- Update available IMD variables based on whether user is viewing LADs or neighbourhoods ----
   observeEvent(input$lad_or_lsoa, {
     if (input$lad_or_lsoa == "Local Authorities") {
