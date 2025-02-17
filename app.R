@@ -106,6 +106,7 @@ ui <- page_sidebar(
 
   theme = bs_theme("lumen", version = 5),
 
+  # ---- Sidebar ----
   sidebar = sidebar(
     # - Select measure of deprivation -
     card(
@@ -151,14 +152,17 @@ ui <- page_sidebar(
     )
   ),
 
+  # ---- Main panel ----
   navset_underline(
-    # ---- Tab 1: Interactive Map ----
     nav_panel(
       "Map",
 
       card(
         full_screen = TRUE,
-        leafletOutput("map", height = 600)
+        card_body(
+          class = "p-0",
+          leafletOutput("map", height = 600)
+        )
       )
     ),
 
@@ -166,6 +170,7 @@ ui <- page_sidebar(
       "Compare areas",
 
       card(
+        full_screen = TRUE,
         card_header(textOutput("comparison_title")),
         plotlyOutput("area_comparison")
       )
