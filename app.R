@@ -46,12 +46,22 @@ lad_boundaries <- boundaries_ltla21 |>
 lad_boundaries <- left_join(lad_boundaries, imd_lad, by = "lad_code")
 
 # ---- Neighbourhood-level data ----
-# Calculate quintiles
-imd_lsoa <- IMD::imd_england_lsoa |>
+lsoa_names <- boundaries_lsoa11 |>
+  st_drop_geometry() |>
+  rename(lsoa_code = lsoa11_code, lsoa_name = lsoa11_name) |>
   left_join(
     lookup_lsoa11_ltla21 |>
-      select(lsoa_code = lsoa11_code, lad_code = ltla21_code)
+      select(lsoa_code = lsoa11_code, lad_code = ltla21_code, lad_name = ltla21_name)
   ) |>
+  left_join(
+    lookup_ltla21_region21 |>
+      select(lad_code = ltla21_code, region_name = region21_name)
+  )
+
+# Calculate quintiles
+imd_lsoa <- IMD::imd_england_lsoa |>
+  left_join(lsoa_names) |>
+  left_join(ruc11_lsoa11, by = join_by(lsoa_code == lsoa11_code)) |>
   mutate(
     IMD_quintile = ceiling(IMD_decile / 2),
     Income_quintile = ceiling(Income_decile / 2),
@@ -61,8 +71,8 @@ imd_lsoa <- IMD::imd_england_lsoa |>
     Crime_quintile = ceiling(Crime_decile / 2),
     Housing_and_Access_quintile = ceiling(Housing_and_Access_decile / 2),
     Environment_quintile = ceiling(Environment_decile / 2)
-  ) |>
-  select(lsoa_code, lad_code, ends_with("quintile"))
+  )
+  # select(lsoa_code, lsoa_name, lad_code, lad_name, ends_with("quintile"), ends_with("rank"))
 
 # Show only 20% most deprived areas on the map
 lsoa_boundaries <-
@@ -86,19 +96,19 @@ imd_lad_variables <-
 
 imd_lsoa_variables <-
   c(
-    "Overall deprivation" = "IMD_quintile",
-    "Income" = "Income_quintile",
-    "Employment" = "Employment_quintile",
-    "Education" = "Education_quintile",
-    "Health" = "Health_quintile",
-    "Crime" = "Crime_quintile",
-    "Housing & Access" = "Housing_and_Access_quintile",
-    "Environment" = "Environment_quintile"
+    "Overall deprivation" = "IMD_decile",
+    "Income deprivation" = "Income_decile",
+    "Employment deprivation" = "Employment_decile",
+    "Education deprivation" = "Education_decile",
+    "Health deprivation" = "Health_decile",
+    "Crime deprivation" = "Crime_decile",
+    "Housing & Access deprivation" = "Housing_and_Access_decile",
+    "Environment deprivation" = "Environment_decile"
   )
 
 # Function to get name of the chosen variable from from dropdown value
 variables_name <- function(value, variables) {
-  names(imd_lad_variables)[match(value, variables)]
+  names(variables)[match(value, variables)]
 }
 
 # ---------------------
@@ -476,11 +486,97 @@ server <- function(input, output, session) {
 
   # ---- Neighbourhood comparison ----
   render_neighbourhood_comparison <- reactive({
-    # Ask the user to pick a region or Local Authority first
-    # otherwise the chart will be too big
-    if (length(input$select_lad) == 0) {
-      return(NULL)
+    imd_lsoa_filtered <- imd_lsoa
+
+    # Fetch the neighbourhoods in the selected Local Authorities
+    if (length(input$select_lad) > 0) {
+      imd_lsoa_filtered <- imd_lsoa_filtered %>% filter(lad_name %in% input$select_lad)
     }
+
+    if (input$region_filter != "England") {
+      imd_lsoa_filtered <- imd_lsoa_filtered %>% filter(region_name == input$region_filter)
+    }
+
+    # Calculate the proportion of neighbourhoods in each IMD decile,
+    # split by rural-urban classification, for the whole of England
+    imd_national_summary <-
+      imd_lsoa |>
+      group_by(.data[[input$imd_var]], classification) |>
+      summarise(n = n()) |>
+      ungroup() |>
+      group_by(classification) |>
+      mutate(prop = n / sum(n)) |>
+      ungroup()
+
+    # Calculate the proportion of neighbourhoods in each IMD decile,
+    # split by rural-urban classification, for the selected region and LADs
+    imd_lsoa_filtered_summary <-
+      imd_lsoa_filtered |>
+      group_by(region_name, .data[[input$imd_var]], classification) |>
+      summarise(n = n()) |>
+      ungroup() |>
+      group_by(classification) |>
+      mutate(prop = n / sum(n)) |>
+      ungroup()
+
+    # Proportion of LSOAs in each IMD decile, split by rural-urban classification
+    plt <-
+      imd_lsoa_filtered_summary |>
+      ggplot(aes(x = .data[[input$imd_var]], y = prop)) +
+      geom_col(
+        aes(
+          fill = region_name,
+          text = str_glue("{scales::comma(n)} ({scales::percent(prop, accuracy = 0.1)}) neighbourhoods in {tolower(classification)}s in {region_name} \nare in {tolower(variables_name(input$imd_var, imd_lsoa_variables))} decile {.data[[input$imd_var]]}")
+        ),
+        position = "stack",
+        show.legend = FALSE
+      ) +
+      geom_point(
+        data = imd_national_summary,
+        aes(
+          text = str_glue("{scales::comma(n)} ({scales::percent(prop, accuracy = 0.1)}) neighbourhoods in {tolower(classification)}s in England \nare in {tolower(variables_name(input$imd_var, imd_lsoa_variables))} decile {.data[[input$imd_var]]}")
+        )
+      ) +
+      coord_flip() +
+      facet_wrap(~classification) +
+      scale_x_continuous(breaks = 1:10, labels = c("Most deprived", 2:9, "Least deprived")) +
+      scale_y_continuous(labels = scales::percent) +
+      scale_fill_brewer(palette = "Pastel1") +
+      theme_minimal() +
+      theme(
+        legend.position = "none"
+      ) +
+      labs(
+        x = variables_name(input$imd_var, imd_lsoa_variables),
+        y = "Proportion of neighbourhoods"
+      )
+
+    ggplotly(plt, height = 500, tooltip = "text") |>
+      config(
+        displayModeBar = TRUE,
+        displaylogo = FALSE,
+        modeBarButtonsToRemove = list(
+          "zoom",
+          "pan",
+          "select",
+          "zoomIn",
+          "zoomOut",
+          "autoScale",
+          "resetScale",
+          "lasso2d",
+          "hoverClosestCartesian",
+          "hoverCompareCartesian"
+        ),
+        # Download button
+        toImageButtonOptions = list(
+          height = NULL,
+          width = NULL,
+          scale = 6
+        )
+      ) |>
+      layout(
+        showlegend = FALSE
+      )
   })
 
   # ---- Comparison tab plot ----
