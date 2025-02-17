@@ -65,6 +65,8 @@ variables_name <- function(value, variables) {
 ui <- page_sidebar(
   includeCSS("styles.css"),
 
+  tags$title("Explore deprivation in England"),
+
   # The title includes an inline drop-down to choose a region.
   tags$h3(
     tags$div(
