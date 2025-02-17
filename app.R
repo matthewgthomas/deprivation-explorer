@@ -22,8 +22,12 @@ library(geographr)
 imd_lad <- read_csv("data/imd_lad.csv")
 imd_lsoa <- read_csv("data/imd_lsoa.csv")
 
-lad_boundaries <- read_sf("data/lad_boundaries.geojson")
-lsoa_boundaries <- read_sf("data/lsoa_boundaries.geojson")
+lad_boundaries <- read_rds("data/lad_boundaries.rds")
+lsoa_boundaries <- read_rds("data/lsoa_boundaries.rds")
+
+lad_names <- lad_boundaries |>
+  st_drop_geometry() |>
+  select(lad_code, lad_name, region_name)
 
 # ---- Dropdown options ----
 imd_lad_variables <-
