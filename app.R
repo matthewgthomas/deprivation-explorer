@@ -34,16 +34,16 @@ lad_names <- lad_boundaries |>
 # ---- Dropdown options ----
 imd_lad_variables <-
   c(
-    "Population-weighted average score" = "Score",
+    "Population-weighted average deprivation" = "Score",
     "% of highly deprived neighbourhoods" = "Proportion",
     "% of people living in the most deprived neighbourhoods" = "Extent",
-    "Income Score" = "Income_Score",
-    "Employment Score" = "Employment_Score",
-    "Education Score" = "Education_Score",
-    "Health Score" = "Health_Score",
-    "Crime Score" = "Crime_Score",
-    "Housing & Access Score" = "Housing_and_Access_Score",
-    "Environment Score" = "Environment_Score"
+    "Income deprivation" = "Income_Score",
+    "Employment deprivation" = "Employment_Score",
+    "Education, Skills and Training deprivation" = "Education_Score",
+    "Health Deprivation and Disability deprivation" = "Health_Score",
+    "Crime deprivation" = "Crime_Score",
+    "Barriers to Housing and Services deprivation" = "Housing_and_Access_Score",
+    "Living Environment deprivation" = "Environment_Score"
   )
 
 imd_lsoa_variables <-
@@ -51,11 +51,11 @@ imd_lsoa_variables <-
     "Overall deprivation" = "IMD_decile",
     "Income deprivation" = "Income_decile",
     "Employment deprivation" = "Employment_decile",
-    "Education deprivation" = "Education_decile",
-    "Health deprivation" = "Health_decile",
+    "Education, Skills and Training deprivation" = "Education_decile",
+    "Health Deprivation and Disability deprivation" = "Health_decile",
     "Crime deprivation" = "Crime_decile",
-    "Housing & Access deprivation" = "Housing_and_Access_decile",
-    "Environment deprivation" = "Environment_decile"
+    "Barriers to Housing and Services deprivation" = "Housing_and_Access_decile",
+    "Living Environment deprivation" = "Environment_decile"
   )
 
 # Function to get name of the chosen variable from from dropdown value
@@ -184,7 +184,7 @@ ui <- page_sidebar(
         card_header(
           textOutput("metadata_title")
         ),
-        plotlyOutput("metadata")
+        plotlyOutput("metadata", fill = FALSE)
       )
     )
   )
