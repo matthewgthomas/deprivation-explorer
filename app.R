@@ -19,6 +19,8 @@ library(geographr)
 #
 # Load data ----
 #
+imd_metadata <- read_csv("https://github.com/humaniverse/IMD/raw/refs/heads/master/metadata.csv")
+
 imd_lad <- read_csv("data/imd_lad.csv")
 imd_lsoa <- read_csv("data/imd_lsoa.csv")
 
@@ -173,6 +175,16 @@ ui <- page_sidebar(
         full_screen = TRUE,
         card_header(textOutput("comparison_title")),
         plotlyOutput("area_comparison")
+      )
+    ),
+
+    nav_panel(
+      "About the data",
+      card(
+        card_header(
+          textOutput("metadata_title")
+        ),
+        plotlyOutput("metadata")
       )
     )
   )
@@ -566,6 +578,89 @@ server <- function(input, output, session) {
     } else {
       render_neighbourhood_comparison()
     }
+  })
+
+  # ---- Metadata tab title ----
+  output$metadata_title <- renderText({
+    # Get the current year
+    current_year <- as.integer(str_sub(Sys.Date(), 1, 4))
+
+    oldest_indicator <- min(imd_metadata$`Earliest year`)
+    newest_indicator <- max(imd_metadata$`Earliest year`)
+
+    str_glue("Data in the English Index of Multiple Deprivation are between {current_year - newest_indicator} and {current_year - oldest_indicator} years old")
+  })
+  # ---- Metadata tab plot ----
+  output$metadata <- renderPlotly({
+    # Shorten indicator names for better display in the tooltip
+    imd_metadata$Indicator <- str_wrap(imd_metadata$Indicator, width = 50)
+
+    # Get the current year
+    current_year <- as.integer(str_sub(Sys.Date(), 1, 4))
+
+    oldest_indicator <- min(imd_metadata$`Earliest year`)
+    newest_indicator <- max(imd_metadata$`Earliest year`)
+
+    plt <-
+      imd_metadata |>
+      ggplot(aes(x = reorder(`Indicator (short)`, -`Earliest year`), y = `Earliest year`)) +
+      geom_segment(aes(xend = `Indicator (short)`), yend = current_year, colour = "grey") +
+      geom_point(
+        aes(
+          colour = Domain,
+          text = str_glue("'{Indicator}' in the {Domain} domain is from {`Earliest year`}")
+        ),
+        size = 3
+      ) +
+      coord_flip() +
+      scale_colour_brewer(palette = "Set2") +
+      scale_y_continuous(limits = c(oldest_indicator, current_year), breaks = seq(oldest_indicator, current_year, by = 2)) +
+      theme_minimal() +
+      # Remove gridlines
+      theme(
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()
+      ) +
+      labs(
+        y = "Year the data is from",
+        x = NULL
+      )
+
+      ggplotly(plt, tooltip = "text", height = 1000) |>
+        config(
+          displayModeBar = TRUE,
+          displaylogo = FALSE,
+          modeBarButtonsToRemove = list(
+            "zoom",
+            "pan",
+            "select",
+            "zoomIn",
+            "zoomOut",
+            "autoScale",
+            "resetScale",
+            "lasso2d",
+            "hoverClosestCartesian",
+            "hoverCompareCartesian"
+          ),
+          # Download button
+          toImageButtonOptions = list(
+            height = NULL,
+            width = NULL,
+            scale = 6
+          )
+        ) |>
+        layout(
+          xaxis = list(side = "top"),
+          legend = list(
+            orientation = "h",
+            #x = 0.5,
+            xanchor = "center",
+            title = "Domain"
+          )
+          # margin = list(t = 50)  # Reduce top margin to bring plot closer to legend
+        )
   })
 }
 
