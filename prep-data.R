@@ -1,6 +1,3 @@
-# Install the 'rename' branch of the 'IMD' package from GitHub
-remotes::install_github("humaniverse/IMD", ref = "rename")
-
 library(tidyverse)
 library(geographr)
 library(IMD)
