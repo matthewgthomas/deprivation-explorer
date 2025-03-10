@@ -31,6 +31,9 @@ lad_names <- lad_boundaries |>
   st_drop_geometry() |>
   select(lad_code, lad_name, region_name)
 
+imd_props <- read_csv("data/imd_props.csv")
+imd_income_employment <- read_csv("data/imd_income_employment.csv")
+
 # ---- Dropdown options ----
 imd_lad_variables <-
   c(
@@ -175,6 +178,21 @@ ui <- page_sidebar(
         full_screen = TRUE,
         card_header(textOutput("comparison_title")),
         plotlyOutput("area_comparison")
+      )
+    ),
+
+    nav_panel(
+      "Population experiencing deprivation",
+
+      card(
+        full_screen = TRUE,
+        card_body(
+          h3("Most people experiencing income deprivation or employment deprivation do not live in the most deprived neighbourhoods."),
+          textOutput("deprived_population"),
+          #plotOutput("deprived_population_plot"),
+          p("There are regional inequalities in the number of people experiencing income deprivation and employment deprivation who live in otherwise less-deprived neighbourhoods. In the East Midlands, East of England, London, South East and South West, most people experiencing income or employment deprivation do *not* live in the 20% most deprived neighbourhoods, meaning deprived is more likely to be hidden in these places."),
+          plotOutput("deprived_population_region_plot")
+        )
       )
     ),
 
@@ -578,6 +596,74 @@ server <- function(input, output, session) {
     } else {
       render_neighbourhood_comparison()
     }
+  })
+
+  # ---- Deprived population tab text ----
+  output$deprived_population <- renderText({
+    imd_lsoa_filtered <- imd_income_employment
+
+    # Fetch the neighbourhoods in the selected Local Authorities
+    if (length(input$select_lad) > 0) {
+      imd_lsoa_filtered <- imd_lsoa_filtered %>% filter(lad_name %in% input$select_lad)
+    }
+
+    if (input$region_filter != "England") {
+      imd_lsoa_filtered <- imd_lsoa_filtered %>% filter(region_name == input$region_filter)
+    }
+
+    imd_props <-
+      imd_lsoa_filtered |>
+      mutate(Core20 = if_else(IMD_decile <= 2, "20% most deprived", "Other")) |>
+      group_by(Core20, name) |>
+      summarise(n = sum(n, na.rm = TRUE)) |>
+      ungroup() |>
+
+      pivot_wider(names_from = name, values_from = n) |>
+      rename(people_income_deprived = `Number of income-deprived people`, people_employment_deprived = `Number of employment-deprived people`) |>
+
+      mutate(
+        prop_income_deprived = people_income_deprived / sum(people_income_deprived),
+        prop_employment_deprived = people_employment_deprived / sum(people_employment_deprived)
+      )
+
+    people_income_deprived <- sum(imd_props$people_income_deprived)
+    prop_income_deprived_non_core20 <- imd_props[imd_props$Core20 == "Other",]$prop_income_deprived
+
+    people_employment_deprived <- sum(imd_props$people_employment_deprived)
+    prop_employment_deprived_non_core20 <- imd_props[imd_props$Core20 == "Other",]$prop_employment_deprived
+
+    # Where are we?
+    if (length(input$select_lad) > 0) {
+      selected_place_names <- str_flatten_comma(input$select_lad, last = " and ")
+    } else {
+      selected_place_names <- input$region_filter
+    }
+
+    str_glue("In {selected_place_names}, {scales::comma(people_income_deprived)} people are experiencing income deprivation; {scales::percent(prop_income_deprived_non_core20)} do *not* live in the 20% most deprived areas. {scales::comma(people_employment_deprived)} people are experiencing employment deprivation; {scales::percent(prop_employment_deprived_non_core20)} do not live in the 20% most deprived areas.")
+  })
+
+  # ---- Deprived population tab plot ----
+
+
+  # ---- Deprived population by region ----
+  output$deprived_population_region_plot <- renderPlot({
+    imd_income_employment |>
+      mutate(Core20 = if_else(IMD_decile <= 2, "20% most deprived", "Less-deprived areas")) |>
+      group_by(region_name, Core20, name) |>
+      summarise(n = sum(n, na.rm = TRUE)) |>
+
+      ggplot(aes(x = name, y = n, fill = Core20)) +
+      geom_col(position = position_dodge()) +
+      coord_flip() +
+      facet_wrap(~region_name) +
+      scale_y_continuous(labels = scales::comma) +
+      theme_minimal() +
+      theme(legend.position = "top") +
+      labs(
+        x = NULL,
+        y = "Number of people",
+        fill = NULL
+      )
   })
 
   # ---- Metadata tab title ----
