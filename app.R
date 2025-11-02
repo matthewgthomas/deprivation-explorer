@@ -5,6 +5,7 @@ library(shiny)
 library(bslib)
 library(leaflet)
 library(dplyr)
+library(tidyr)
 library(ggplot2)
 library(readr)
 library(stringr)
@@ -19,7 +20,7 @@ library(geographr)
 #
 # Load data ----
 #
-imd_metadata <- read_csv("https://github.com/humaniverse/IMD/raw/refs/heads/master/metadata.csv")
+imd_metadata <- read_csv("data/metadata_england.csv")
 
 imd_lad <- read_csv("data/imd_lad.csv")
 imd_lsoa <- read_csv("data/imd_lsoa.csv")
@@ -672,7 +673,7 @@ server <- function(input, output, session) {
     current_year <- as.integer(str_sub(Sys.Date(), 1, 4))
 
     oldest_indicator <- min(imd_metadata$`Earliest year`)
-    newest_indicator <- max(imd_metadata$`Earliest year`)
+    newest_indicator <- max(imd_metadata$`Latest year`)
 
     str_glue("Data in the English Index of Multiple Deprivation are between {current_year - newest_indicator} and {current_year - oldest_indicator} years old")
   })
@@ -689,12 +690,21 @@ server <- function(input, output, session) {
 
     plt <-
       imd_metadata |>
+      mutate(year_label = if_else(`Earliest year` == `Latest year`, as.character(`Earliest year`), str_glue("{`Earliest year`} - {`Latest year`}"))) |>
       ggplot(aes(x = reorder(`Indicator (short)`, -`Earliest year`), y = `Earliest year`)) +
-      geom_segment(aes(xend = `Indicator (short)`), yend = current_year, colour = "grey") +
+      geom_segment(aes(xend = `Indicator (short)`, yend = `Latest year`), colour = "grey") +
       geom_point(
         aes(
           colour = Domain,
-          text = str_glue("'{Indicator}' in the {Domain} domain is from {`Earliest year`}")
+          text = str_glue("'{Indicator}' in the {Domain} domain is from {year_label}")
+        ),
+        size = 3
+      ) +
+      geom_point(
+        aes(
+          y = `Latest year`,
+          colour = Domain,
+          text = str_glue("'{Indicator}' in the {Domain} domain is from {year_label}")
         ),
         size = 3
       ) +

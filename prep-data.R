@@ -2,6 +2,7 @@ library(tidyverse)
 library(geographr)
 library(IMD)
 library(sf)
+library(googlesheets4)
 
 # ---- Local Authority data ----
 lad_names <- boundaries_ltla24 |>
@@ -100,6 +101,9 @@ imd_income_employment <-
   rename(`Number of income-deprived people` = `Income Domain numerator`, `Number of employment-deprived people` = `Employment Domain numerator`) |>
   pivot_longer(cols = contains("people"), values_to = "n")
 
+# ---- Metadata ----
+metadata_england <- read_sheet("https://docs.google.com/spreadsheets/d/1FmxLZl_WObibUoGkw1on5SAifVB6Pudsctio5apaKlI/edit?usp=sharing", sheet = "England 2025")
+
 # ---- Save data ----
 write_csv(imd_lad, "data/imd_lad.csv")
 write_csv(imd_lsoa, "data/imd_lsoa.csv")
@@ -112,3 +116,5 @@ write_rds(lsoa_boundaries, "data/lsoa_boundaries.rds")
 
 write_csv(imd_props, "data/imd_props.csv")
 write_csv(imd_income_employment, "data/imd_income_employment.csv")
+
+write_csv(metadata_england, "data/metadata_england.csv")

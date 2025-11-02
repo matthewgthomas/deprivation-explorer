@@ -1,0 +1,53 @@
+Nation,Domain,Subdomain,Indicator,Indicator (short),Year,Earliest year,Latest year
+England,Income,NA,Adults and children in Income Support benefit units,People receiving Income Support,,2024,2024
+England,Income,NA,Adults and children in income-based Jobseeker’s Allowance benefit units,People receiving Jobseeker’s Allowance,,2024,2024
+England,Income,NA,Adults and children in income-based Employment and Support Allowance benefit units,People receiving Employment and Support Allowance,,2024,2024
+England,Income,NA,Adults and children in Pension Credit (Guarantee) benefit units,People receiving Pension Credit,,2024,2024
+England,Income,NA,Adults and children in Universal Credit benefit units ‘out of work’ conditionality categories,People receiving Universal Credit (out of work),,2024,2024
+England,Income,NA,Adults and children in Universal Credit ‘in-work’ conditionality groups with monthly equivalised income below 70% of the national median (after housing costs),People receiving Universal Credit (in work),,2024,2024
+England,Income,NA,Adults and children in Housing Benefit claimant benefit units with monthly equivalised income below 70% of the national median (after housing costs),People receiving Housing Benefit,,2024,2024
+England,Income,NA,Adults and Children in Tax Credit benefit units with monthly equivalised income below 70% of the national median (after housing costs),People receiving Tax Credits,,2024,2024
+England,Income,NA,Asylum seeker adults and children in dispersed accommodation in receipt of support,Asylum seekers receiving support,,2024,2024
+England,Employment,NA,Claimants of Jobseeker’s Allowance (both contribution-based and income-based),Claimants of Jobseeker’s Allowance,,2022,2023
+England,Employment,NA,Claimants of New Style Jobseeker’s Allowance,Claimants of Jobseeker’s Allowance (New Style),,2022,2023
+England,Employment,NA,Claimants of Employment and Support Allowance (both contribution-based and income-based),Claimants of Employment and Support Allowance,,2022,2023
+England,Employment,NA,Claimants of New Style Employment and Support Allowance,Claimants of Employment and Support Allowance (New Style),,2022,2023
+England,Employment,NA,Claimants of Incapacity Benefit,Claimants of Incapacity Benefit,,2022,2023
+England,Employment,NA,Claimants of Severe Disablement Allowance,Claimants of Severe Disablement Allowance,,2022,2023
+England,Employment,NA,Claimants of Carer’s Allowance,Claimants of Carer’s Allowance,,2022,2023
+England,Employment,NA,Claimants of Income Support,Claimants of Income Support,,2022,2023
+England,Employment,NA,Claimants of Universal Credit in the 'No work requirements’ conditionality group,Claimants of Universal Credit (no work requirements),,2022,2023
+England,Employment,NA,Claimants of Universal Credit in the 'Searching for work' conditionality group,Claimants of Universal Credit (searching for work),,2022,2023
+England,Employment,NA,Claimants of Universal Credit in the 'Planning for work' conditionality group,Claimants of Universal Credit (planning for work),,2022,2023
+England,Employment,NA,Claimants of Universal Credit in the 'Preparing for work' conditionality group,Claimants of Universal Credit (preparing for work),,2022,2023
+England,"Education, Skills and Training",Children and Young People,Key Stage 2 attainment,Key Stage 2 attainment,,2018,2023
+England,"Education, Skills and Training",Children and Young People,Key Stage 4 attainment,Key Stage 4 attainment,,2018,2023
+England,"Education, Skills and Training",Children and Young People,Entry to higher education,Entry to higher education,,2018,2023
+England,"Education, Skills and Training",Children and Young People,Pupil absence,Pupil absence,,2018,2023
+England,"Education, Skills and Training",Children and Young People,Persistent pupil absence,Persistent pupil absence,,2018,2023
+England,"Education, Skills and Training",Adults,"Adult skills: The proportion of working-age adults with no or low qualifications or who cannot speak English or cannot speak English well, aged 25 to 66",Adult skills,,2021,2021
+England,Health Deprivation and Disability,NA,Years of potential life lost,Years of potential life lost,,2018,2022
+England,Health Deprivation and Disability,NA,Comparative illness and disability ratio (people receiving health-related benefits),Comparative illness and disability ratio,,2022,2023
+England,Health Deprivation and Disability,NA,Acute morbidity,Acute morbidity,,2021,2023
+England,Health Deprivation and Disability,NA,"Mental health (suicide, hospital admissions, prescriptions, Personal Independence Payments and Disability Living Allowance)",Mental health,,2018,2023
+England,Crime,NA,"Rate of violence with injury per 1,000 at-risk population",Violence (with injury),,2018,2024
+England,Crime,NA,"Rate of violence without injury per 1,000 at-risk population",Violence (without injury),,2018,2024
+England,Crime,NA,"Rate of stalking and harassment per 1,000 at-risk population",Stalking and harassment,,2018,2024
+England,Crime,NA,"Rate of burglary per 1,000 at-risk properties",Burglary,,2018,2024
+England,Crime,NA,"Rate of theft per 1,000 at-risk population",Theft,,2018,2024
+England,Crime,NA,"Rate of criminal damage per 1,000 at-risk population",Criminal damage,,2018,2024
+England,Crime,NA,"Rate of public order and possession of weapons per 1,000 at risk population",Public order and possession of weapons,,2018,2024
+England,Crime,NA,"Rate of anti-social behaviour per 1,000 at risk population",Anti-social behaviour,,2022,2024
+England,Barriers to Housing and Services,Geographical Barriers,Connectivity score,Connectivity score,,2025,2025
+England,Barriers to Housing and Services,Wider Barriers,Household overcrowding,Household overcrowding,,2021,2021
+England,Barriers to Housing and Services,Wider Barriers,Statutory homelessness,Statutory homelessness,,2021,2024
+England,Barriers to Housing and Services,Wider Barriers,Core homelessness,Core homelessness,,2018,2023
+England,Barriers to Housing and Services,Wider Barriers,Housing affordability,Housing affordability,,2018,2022
+England,Barriers to Housing and Services,Wider Barriers,Broadband speed,Broadband speed,,2025,2025
+England,Barriers to Housing and Services,Wider Barriers,Patient-to-GP ratio,Patient-to-GP ratio,,2025,2025
+England,Living Environment,Indoors,Housing Energy Performance Score,Housing Energy Performance Score,,2012,2024
+England,Living Environment,Indoors,Housing in poor condition,Housing in poor condition,,2019,2023
+England,Living Environment,Indoors,Housing lacking private outdoor space,Lack of private outdoor space,,2023,2023
+England,Living Environment,Outdoors,Air quality,Air quality,,2023,2023
+England,Living Environment,Outdoors,Road traffic accidents,Road traffic accidents,,2019,2023
+England,Living Environment,Outdoors,Noise pollution,Noise pollution,,2021,2021
