@@ -38,16 +38,16 @@ imd_income_employment <- read_csv("data/imd_income_employment.csv")
 # ---- Dropdown options ----
 imd_lad_variables <-
   c(
-    "Population-weighted average deprivation" = "Score",
-    "% of highly deprived neighbourhoods" = "Proportion",
-    "% of people living in the most deprived neighbourhoods" = "Extent",
-    "Income deprivation" = "Income_Score",
-    "Employment deprivation" = "Employment_Score",
-    "Education, Skills and Training deprivation" = "Education_Score",
-    "Health Deprivation and Disability deprivation" = "Health_Score",
-    "Crime deprivation" = "Crime_Score",
-    "Barriers to Housing and Services deprivation" = "Housing_and_Access_Score",
-    "Living Environment deprivation" = "Environment_Score"
+    "Population-weighted average deprivation" = "imd_average_score",
+    "% of highly deprived neighbourhoods" = "imd_proportion_of_lso_as_in_most_deprived_10_percent_nationally",
+    "% of people living in the most deprived neighbourhoods" = "imd25_extent",
+    "Income deprivation" = "income_average_score",
+    "Employment deprivation" = "employment_average_score",
+    "Education, Skills and Training deprivation" = "education_skills_and_training_average_score",
+    "Health Deprivation and Disability deprivation" = "health_deprivation_and_disability_average_score",
+    "Crime deprivation" = "crime_average_score",
+    "Barriers to Housing and Services deprivation" = "barriers_to_housing_and_services_average_score",
+    "Living Environment deprivation" = "living_environment_average_score"
   )
 
 imd_lsoa_variables <-
@@ -392,7 +392,7 @@ server <- function(input, output, session) {
           dashArray = "",
           fillOpacity = 0.7,
           bringToFront = TRUE),
-        label = ~str_glue("{lsoa11_name} is in {tolower(variables_name(imd_var, imd_lsoa_variables))} decile {get(imd_var)}")
+        label = ~str_glue("{lsoa_name} is in {tolower(variables_name(imd_var, imd_lsoa_variables))} decile {get(imd_var)}")
         # label = ~paste0(lsoa11_name, ": ", round(get(imd_var), 2))
       )
   })

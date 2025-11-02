@@ -4,6 +4,22 @@ library(IMD)
 library(sf)
 library(googlesheets4)
 
+lookup_ltla24_region <- read_sf(
+  "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LAD24_RGN24_EN_LU/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson"
+)
+
+lookup_ltla24_region <- lookup_ltla24_region |>
+  st_drop_geometry() |>
+  select(ltla24_code = LAD24CD, region = RGN24NM)
+
+ruc21_lsoa21 <- read_sf(
+  "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/LSOA21_RUC21_EW_LU/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson"
+)
+
+ruc21_lsoa21 <- ruc21_lsoa21 |>
+  st_drop_geometry() |>
+  select(lsoa21_code = LSOA21CD, classification = RUC21NM, ruc = Urban_rural_flag)
+
 # ---- Local Authority data ----
 lad_names <- boundaries_ltla24 |>
   st_drop_geometry() |>
@@ -14,11 +30,11 @@ lad_names <- boundaries_ltla24 |>
   )
 
 # IMD for Local Authority Districts (LAD)
-imd_lad <- IMD::imd2019_england_ltla23 |>
-  rename(lad_code = ltla23_code) |>
+imd_lad <- IMD::imd2025_england_ltla24 |>
+  rename(lad_code = ltla24_code) |>
   left_join(
-    lookup_ltla23_region23 |>
-      select(lad_code = ltla23_code, region_name = region23_name)
+    lookup_ltla24_region |>
+      select(lad_code = ltla24_code, region_name = region)
   ) |>
   left_join(lad_names)
 
@@ -33,62 +49,54 @@ lad_boundaries <- boundaries_ltla24 |>
 lad_boundaries <- left_join(lad_boundaries, imd_lad, by = c("lad_code", "lad_name"))
 
 # ---- Neighbourhood-level data ----
-lookup_lsoa11_ltla23 <-
-  geographr::lookup_lsoa11_ltla21 |>
-  select(lsoa11_code, ltla22_code = ltla21_code) |>
-  left_join(
-    lookup_ltla22_ltla23 |> select(ltla22_code, ltla23_code, ltla23_name)
-  ) |>
-  select(-ltla22_code)
-
-lsoa_names <- boundaries_lsoa11 |>
+lsoa_names <- boundaries_lsoa21 |>
   st_drop_geometry() |>
-  rename(lsoa_code = lsoa11_code, lsoa_name = lsoa11_name) |>
+  rename(lsoa_code = lsoa21_code, lsoa_name = lsoa21_name) |>
   left_join(
-    lookup_lsoa11_ltla23 |>
-      select(lsoa_code = lsoa11_code, lad_code = ltla23_code, lad_name = ltla23_name)
+    lookup_lsoa21_ward24_ltla24 |>
+      select(lsoa_code = lsoa21_code, lad_code = ltla24_code, lad_name = ltla24_name)
   ) |>
   left_join(
-    lookup_ltla23_region23 |>
-      select(lad_code = ltla23_code, region_name = region23_name)
+    lookup_ltla24_region |>
+      select(lad_code = ltla24_code, region_name = region)
   )
 
 # Calculate quintiles
-imd_lsoa <- IMD::imd2019_england_lsoa11 |>
-  rename(lsoa_code = lsoa11_code) |>
+imd_lsoa <- IMD::imd2025_england_lsoa21 |>
+  rename(lsoa_code = lsoa21_code) |>
   left_join(lsoa_names) |>
-  left_join(ruc11_lsoa11, by = join_by(lsoa_code == lsoa11_code))
+  left_join(ruc21_lsoa21, by = join_by(lsoa_code == lsoa21_code))
 
 # Show only 20% most deprived areas on the map
 lsoa_boundaries <-
-  boundaries_lsoa11 |>
-  left_join(imd_lsoa, by = join_by(lsoa11_code == lsoa_code))
+  boundaries_lsoa21 |>
+  left_join(imd_lsoa, by = join_by(lsoa21_code == lsoa_code))
 
 # ---- Analyse income and employment deprivation ----
 imd_income_employment <-
-  imd2019_england_lsoa11 |>
-  select(lsoa11_code, IMD_decile) |>
+  imd2025_england_lsoa21 |>
+  select(lsoa21_code, IMD_decile) |>
   left_join(
-    imd2019_england_lsoa11_indicators |>
-      select(lsoa11_code, `Income Domain numerator`, `Employment Domain numerator`)
+    imd2025_england_lsoa21_indicators |>
+      select(lsoa21_code, income_domain_numerator, employment_domain_numerator)
   ) |>
   left_join(
-    lookup_lsoa11_ltla23 |>
-      select(lsoa11_code, lad_code = ltla23_code, lad_name = ltla23_name)
+    lookup_lsoa21_ward24_ltla24 |>
+      select(lsoa21_code, lad_code = ltla24_code, lad_name = ltla24_name)
   ) |>
   left_join(
-    lookup_ltla23_region23 |>
-      select(lad_code = ltla23_code, region_name = region23_name)
+    lookup_ltla24_region |>
+      select(lad_code = ltla24_code, region_name = region)
   ) |>
-  rename(lsoa_code = lsoa11_code)
+  rename(lsoa_code = lsoa21_code)
 
 imd_props <-
   imd_income_employment |>
   mutate(Core20 = if_else(IMD_decile <= 2, "20% most deprived", "Other")) |>
   group_by(Core20) |>
   summarise(
-    people_income_deprived = sum(`Income Domain numerator`, na.rm = TRUE),
-    people_employment_deprived = sum(`Employment Domain numerator`, na.rm = TRUE)
+    people_income_deprived = sum(income_domain_numerator, na.rm = TRUE),
+    people_employment_deprived = sum(employment_domain_numerator, na.rm = TRUE)
   ) |>
   ungroup() |>
   mutate(
@@ -98,7 +106,7 @@ imd_props <-
 
 imd_income_employment <-
   imd_income_employment |>
-  rename(`Number of income-deprived people` = `Income Domain numerator`, `Number of employment-deprived people` = `Employment Domain numerator`) |>
+  rename(`Number of income-deprived people` = income_domain_numerator, `Number of employment-deprived people` = employment_domain_numerator) |>
   pivot_longer(cols = contains("people"), values_to = "n")
 
 # ---- Metadata ----
